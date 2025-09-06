@@ -1,0 +1,21 @@
+# FastAPI and Web Server
+fastapi
+uvicorn[standard]
+
+# Database
+sqlalchemy
+psycopg2-binary
+asyncpg
+
+# Authentication & Security (Specific versions to resolve conflicts)
+passlib==1.7.4
+python-jose[cryptography]
+
+# Machine Learning
+tensorflow
+scikit-learn
+pandas
+faker
+
+# Utilities
+python-dotenv
