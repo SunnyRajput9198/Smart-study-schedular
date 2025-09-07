@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import ProtectedRoute from '../components/ProtectedRoute';
 import useAuthStore from '../stores/authStore';
 import apiClient from '../api/axios';
+import SmartSchedule from '../components/SmartSchedulat'; // Import the new component
 import AddSubjectForm from '../components/AddSubjectform'; // Import the new component
 import Link from 'next/link';
 
@@ -60,6 +61,7 @@ export default function DashboardPage() {
         </header>
 
         <main>
+          <SmartSchedule />
           {/* Render the form and pass the handler function as a prop */}
           <AddSubjectForm onSubjectAdded={handleSubjectAdded} />
 

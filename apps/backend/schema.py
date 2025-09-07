@@ -141,7 +141,7 @@ class ScheduleTask(BaseModel):
 
 class DailySchedule(BaseModel):
     schedule: List[ScheduleTask]
-    insights: Dict[str, Any]
+    insights: List[str]
     generated_at: datetime
 
 class TimePrediction(BaseModel):
