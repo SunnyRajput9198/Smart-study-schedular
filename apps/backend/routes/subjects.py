@@ -34,18 +34,59 @@ def get_all_subjects(
     subjects = db.query(models.Subject).filter(models.Subject.user_id == current_user.id).all()
     return subjects
 
+
 @router.get("/{subject_id}", response_model=schema.Subject)
 def get_single_subject(
     subject_id: int,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    # --- START OF DEBUGGING CODE ---
+    print(f"\n--- DEBUGGING: get_single_subject ---")
+    print(f"Requested subject_id: {subject_id} (Type: {type(subject_id)})")
+    print(f"Current user_id: {current_user.id} (Type: {type(current_user.id)})")
+    print(f"Current user email: {current_user.email}")
+    
+    # Check if subject exists at all (regardless of user)
+    subject_exists = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+    if subject_exists:
+        print(f"Subject {subject_id} exists, belongs to user_id: {subject_exists.user_id}")
+        if subject_exists.user_id != current_user.id:
+            print("ERROR: Subject belongs to different user!")
+        else:
+            print("SUCCESS: Subject belongs to current user")
+    else:
+        print(f"ERROR: Subject {subject_id} does not exist in database")
+    print("--- END DEBUGGING ---\n")
+    # --- END OF DEBUGGING CODE ---
+
+    # Validate subject_id is positive
+    if subject_id <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Invalid subject ID"
+        )
+
+    # Query for the subject
     subject = db.query(models.Subject).filter(
         models.Subject.id == subject_id,
         models.Subject.user_id == current_user.id
     ).first()
 
     if not subject:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
-    
+        # More specific error messages
+        subject_exists = db.query(models.Subject).filter(models.Subject.id == subject_id).first()
+        if subject_exists:
+            # Subject exists but belongs to different user
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Subject not found or you don't have permission to access it"
+            )
+        else:
+            # Subject doesn't exist at all
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Subject not found"
+            )
+
     return subject

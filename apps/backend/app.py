@@ -32,6 +32,7 @@ async def startup_event():
 
 # CORS Middleware allows your frontend (localhost:3000) to talk to this backend
 origins = ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -63,18 +64,3 @@ async def test_database():
     except Exception as e:
         return {"status": "Database connection failed", "error": str(e)}
 
-@app.get("/test/subjects/{user_id}")
-async def test_subjects(user_id: int):
-    try:
-        import asyncpg
-        DATABASE_URL = os.getenv("DATABASE_URL")
-        conn = await asyncpg.connect(DATABASE_URL)
-        
-        query = "SELECT id, name FROM subjects WHERE user_id = $1"
-        rows = await conn.fetch(query, user_id)
-        await conn.close()
-        
-        return {"subjects": [dict(row) for row in rows]}
-    except Exception as e:
-        return {"error": str(e)}
-    

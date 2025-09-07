@@ -42,5 +42,8 @@ def login_for_access_token(form_data: schema.UserLogin, db: Session = Depends(ge
             headers={"WWW-Authenticate": "Bearer"},
         )
             
-    access_token = security.create_access_token(data={"sub": user.username})
+    # THE FIX: Add the user's ID to the data that goes into the token
+    token_data = {"sub": user.username, "user_id": user.id}
+    access_token = security.create_access_token(data=token_data)
+    
     return {"access_token": access_token, "token_type": "bearer"}
