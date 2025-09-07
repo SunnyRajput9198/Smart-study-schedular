@@ -1,396 +1,360 @@
-# ml/priority_scorer.py
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+# priority_scorer.py
 import asyncpg
-import json
-import os
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
+import numpy as np
 
 class PriorityScorer:
     def __init__(self, database_url: str):
         self.database_url = database_url
+        self.pool = None
+
+    async def init(self):
+        if self.pool is None:
+            self.pool = await asyncpg.create_pool(self.database_url)
         
-        # Configurable weights for priority scoring
-        self.weights = {
-            'urgency': 0.35,           # How close to deadline
-            'difficulty': 0.25,        # Subject difficulty based on past ratings
-            'forgetting_curve': 0.25,  # Time since last study of this subject
-            'productivity': 0.15       # Current time productivity factor
-        }
-        
-        # Productivity hours (when user is most productive)
-        self.productivity_hours = {
-            'high': [9, 10, 11, 14, 15, 16, 19, 20],  # Peak hours
-            'medium': [8, 12, 13, 17, 18, 21],         # Good hours
-            'low': [7, 22, 23, 0, 1, 2, 3, 4, 5, 6]   # Low productivity hours
-        }
-        
-    async def get_user_subject_stats(self, user_id: int) -> Dict[int, Dict[str, float]]:
-        """Get historical statistics for user's subjects"""
-        conn = await asyncpg.connect(self.database_url)
-        
+    async def get_pending_tasks(self, user_id: int):
+        """Get pending tasks for user matching the actual database schema."""
         try:
             query = """
-            SELECT 
-                s.id as subject_id,
-                s.name as subject_name,
-                AVG(ss.user_difficulty_rating) as avg_difficulty,
-                AVG(ss.actual_duration / NULLIF(t.estimated_time, 0)) as avg_time_ratio,
-                COUNT(ss.id) as session_count,
-                MAX(ss.completed_at) as last_studied,
-                AVG(CASE WHEN ss.completed_at >= NOW() - INTERVAL '7 days' 
-                     THEN ss.user_difficulty_rating END) as recent_difficulty
-            FROM subjects s
-            LEFT JOIN tasks t ON s.id = t.subject_id
-            LEFT JOIN study_sessions ss ON t.id = ss.task_id
-            WHERE s.user_id = $1
-            GROUP BY s.id, s.name
+                SELECT 
+                    t.id AS task_id,
+                    t.title AS task_name,
+                    s.name AS subject_name,
+                    t.estimated_time,
+                    t.deadline,
+                    t.status,
+                    t.task_type,
+                    s.id AS subject_id,
+                    s.color_tag
+                FROM tasks t
+                JOIN subjects s ON t.subject_id = s.id
+                WHERE t.user_id = $1 
+                AND t.status = 'pending'
+                AND (t.deadline IS NULL OR t.deadline >= CURRENT_DATE)
+                ORDER BY t.deadline ASC NULLS LAST
+                LIMIT 50
             """
             
-            rows = await conn.fetch(query, user_id)
-            
-            subject_stats = {}
-            for row in rows:
-                subject_stats[row['subject_id']] = {
-                    'name': row['subject_name'],
-                    'avg_difficulty': float(row['avg_difficulty'] or 3.0),
-                    'avg_time_ratio': float(row['avg_time_ratio'] or 1.0),
-                    'session_count': int(row['session_count'] or 0),
-                    'last_studied': row['last_studied'],
-                    'recent_difficulty': float(row['recent_difficulty'] or row['avg_difficulty'] or 3.0)
-                }
-            
-            return subject_stats
-            
-        finally:
-            await conn.close()
-    
-    async def get_pending_tasks(self, user_id: int) -> List[Dict[str, Any]]:
-        """Get all pending tasks for a user"""
-        conn = await asyncpg.connect(self.database_url)
-        
-        try:
-            # FIXED: Using correct column names (title instead of name, deadline instead of due_date, completed instead of status)
-            query = """
-            SELECT 
-                t.id,
-                t.title as name,
-                t.description,
-                t.estimated_time,
-                t.deadline as due_date,
-                t.created_at,
-                s.id as subject_id,
-                s.name as subject_name
-            FROM tasks t
-            JOIN subjects s ON t.subject_id = s.id
-            WHERE s.user_id = $1 AND t.completed = FALSE
-            ORDER BY t.deadline ASC
-            """
-            
-            rows = await conn.fetch(query, user_id)
-            
-            tasks = []
-            for row in rows:
-                # Handle timezone-aware datetime conversion
-                due_date = row['due_date']
-                if due_date and due_date.tzinfo is None:
-                    due_date = due_date.replace(tzinfo=None)  # Make timezone-naive for comparison
+            await self.init()
+            async with self.pool.acquire() as conn:
+
+                rows = await conn.fetch(query, user_id)
                 
-                tasks.append({
-                    'id': row['id'],
-                    'name': row['name'],
-                    'estimated_time': row['estimated_time'],
-                    'due_date': due_date,
-                    'created_at': row['created_at'],
-                    'subject_id': row['subject_id'],
-                    'subject_name': row['subject_name']
-                })
-            
-            return tasks
-            
+                tasks = []
+                for row in rows:
+                    # Calculate days until due
+                    if row['deadline']:
+                        # Convert deadline to date if it's datetime
+                        deadline_date = row['deadline'].date() if hasattr(row['deadline'], 'date') else row['deadline']
+                        days_until_due = (deadline_date - datetime.now().date()).days
+                    else:
+                        days_until_due = 30  # Default if no deadline
+                    
+                    tasks.append({
+                        'task_id': row['task_id'],
+                        'task_name': row['task_name'],
+                        'subject_name': row['subject_name'],
+                        'subject_id': row['subject_id'],
+                        'estimated_time': row['estimated_time'] or 60,  # Default to 60 minutes
+                        'days_until_due': max(0, days_until_due),
+                        'task_type': row['task_type'] or 'general',
+                        'status': row['status']
+                    })
+                
+                return tasks
+                
         except Exception as e:
             print(f"Error in get_pending_tasks: {e}")
-            print(f"Database URL: {self.database_url}")
-            raise
-        finally:
-            await conn.close()
+            import traceback
+            traceback.print_exc()
+            return []
     
-    def calculate_urgency_score(self, due_date: datetime, current_time: datetime = None) -> float:
-        """Calculate urgency score based on time until due date"""
-        if current_time is None:
-            current_time = datetime.now()
+    async def get_user_stats(self, user_id: int):
+        """Get user performance statistics by subject."""
+        try:
+            query = """
+                SELECT 
+                    s.id AS subject_id,
+                    s.name AS subject_name,
+                    COUNT(DISTINCT ss.task_id) AS completed_tasks,
+                    AVG(ss.actual_duration) AS avg_actual_duration,
+                    AVG(ss.user_difficulty_rating) AS avg_difficulty,
+                    COUNT(DISTINCT DATE(ss.completed_at)) AS study_days
+                FROM subjects s
+                LEFT JOIN tasks t ON s.id = t.subject_id
+                LEFT JOIN study_sessions ss ON t.id = ss.task_id
+                WHERE s.user_id = $1
+                GROUP BY s.id, s.name
+            """
+            
+            await self.init()
+            async with self.pool.acquire() as conn:
+
+                rows = await conn.fetch(query, user_id)
+                
+                stats = {}
+                for row in rows:
+                    stats[row['subject_id']] = {
+                        'subject_name': row['subject_name'],
+                        'completed_tasks': row['completed_tasks'] or 0,
+                        'avg_actual_duration': float(row['avg_actual_duration'] or 60),
+                        'avg_difficulty': float(row['avg_difficulty'] or 3),
+                        'study_days': row['study_days'] or 0
+                    }
+                
+                return stats
+                
+        except Exception as e:
+            print(f"Error in get_user_stats: {e}")
+            return {}
+    
+    def calculate_priority_score(self, task: Dict, user_stats: Dict) -> float:
+        """Calculate priority score for a task."""
+        score = 0.0
         
-        # Make sure both datetimes are timezone-naive for comparison
-        if due_date.tzinfo is not None:
-            due_date = due_date.replace(tzinfo=None)
-        if current_time.tzinfo is not None:
-            current_time = current_time.replace(tzinfo=None)
-        
-        time_until_due = (due_date - current_time).total_seconds() / 3600  # Hours until due
-        
-        if time_until_due <= 0:
-            return 1.0  # Overdue - maximum urgency
-        elif time_until_due <= 24:
-            return 0.9  # Due within 24 hours
-        elif time_until_due <= 72:
-            return 0.7  # Due within 3 days
-        elif time_until_due <= 168:
-            return 0.5  # Due within a week
-        elif time_until_due <= 336:
-            return 0.3  # Due within 2 weeks
+        # 1. Urgency factor (40% weight)
+        days_until_due = task.get('days_until_due', 30)
+        if days_until_due <= 1:
+            urgency_score = 1.0
+        elif days_until_due <= 3:
+            urgency_score = 0.9
+        elif days_until_due <= 7:
+            urgency_score = 0.7
+        elif days_until_due <= 14:
+            urgency_score = 0.5
         else:
-            return 0.1  # More than 2 weeks away
-    
-    def calculate_difficulty_score(self, subject_stats: Dict[str, Any]) -> float:
-        """Calculate difficulty score based on historical user ratings"""
-        avg_difficulty = subject_stats.get('avg_difficulty', 3.0)
-        recent_difficulty = subject_stats.get('recent_difficulty', avg_difficulty)
+            urgency_score = 0.3
+        score += urgency_score * 0.4
         
-        # Weight recent difficulty more heavily
-        weighted_difficulty = (recent_difficulty * 0.7) + (avg_difficulty * 0.3)
-        
-        # Normalize to 0-1 scale (difficulty 1-5 maps to 0.0-1.0)
-        return (weighted_difficulty - 1) / 4
-    
-    def calculate_forgetting_curve_score(self, last_studied: Optional[datetime], 
-                                       current_time: datetime = None) -> float:
-        """Calculate forgetting curve score based on time since last study"""
-        if current_time is None:
-            current_time = datetime.now()
-        
-        if last_studied is None:
-            return 1.0  # Never studied - highest priority
-        
-        # Handle timezone-naive comparison
-        if last_studied.tzinfo is not None:
-            last_studied = last_studied.replace(tzinfo=None)
-        if current_time.tzinfo is not None:
-            current_time = current_time.replace(tzinfo=None)
-        
-        days_since_study = (current_time - last_studied).total_seconds() / (24 * 3600)
-        
-        if days_since_study <= 1:
-            return 0.1  # Recently studied
-        elif days_since_study <= 3:
-            return 0.3  # Study again soon
-        elif days_since_study <= 7:
-            return 0.6  # Spaced repetition interval
-        elif days_since_study <= 14:
-            return 0.8  # Important to review
-        else:
-            return 1.0  # Long time since study - high priority
-    
-    def calculate_productivity_score(self, current_time: datetime = None) -> float:
-        """Calculate productivity score based on current time of day"""
-        if current_time is None:
-            current_time = datetime.now()
-        
-        hour = current_time.hour
-        
-        if hour in self.productivity_hours['high']:
-            return 1.0  # Peak productivity time
-        elif hour in self.productivity_hours['medium']:
-            return 0.6  # Good productivity time
-        else:
-            return 0.3  # Low productivity time
-    
-    def calculate_task_priority(self, task: Dict[str, Any], 
-                              subject_stats: Dict[str, Any],
-                              current_time: datetime = None) -> Dict[str, Any]:
-        """Calculate overall priority score for a task"""
-        if current_time is None:
-            current_time = datetime.now()
-        
-        # Calculate individual scores
-        urgency_score = self.calculate_urgency_score(task['due_date'], current_time)
-        difficulty_score = self.calculate_difficulty_score(subject_stats)
-        forgetting_score = self.calculate_forgetting_curve_score(
-            subject_stats.get('last_studied'), current_time
-        )
-        productivity_score = self.calculate_productivity_score(current_time)
-        
-        # Calculate weighted priority score
-        priority_score = (
-            urgency_score * self.weights['urgency'] +
-            difficulty_score * self.weights['difficulty'] +
-            forgetting_score * self.weights['forgetting_curve'] +
-            productivity_score * self.weights['productivity']
-        )
-        
-        # Calculate days until due (handle timezone)
-        due_date = task['due_date']
-        if due_date.tzinfo is not None:
-            due_date = due_date.replace(tzinfo=None)
-        if current_time.tzinfo is not None:
-            current_time = current_time.replace(tzinfo=None)
-        
-        return {
-            'task_id': task['id'],
-            'task_name': task['name'],
-            'subject_name': task['subject_name'],
-            'estimated_time': task['estimated_time'],
-            'due_date': task['due_date'],
-            'priority_score': round(priority_score, 3),
-            'urgency_score': round(urgency_score, 3),
-            'difficulty_score': round(difficulty_score, 3),
-            'forgetting_score': round(forgetting_score, 3),
-            'productivity_score': round(productivity_score, 3),
-            'days_until_due': (due_date - current_time).days,
-            'subject_avg_difficulty': subject_stats.get('avg_difficulty', 3.0),
-            'days_since_last_study': (
-                (current_time - subject_stats['last_studied']).days 
-                if subject_stats.get('last_studied') else None
-            )
+        # 2. Task type importance (20% weight)
+        task_type_weights = {
+            'exam': 1.0,
+            'assignment': 0.9,
+            'project': 0.85,
+            'practice': 0.6,
+            'reading': 0.5,
+            'review': 0.4,
+            'general': 0.3
         }
-    
-    async def generate_daily_schedule(self, user_id: int, 
-                                    max_tasks: int = 10,
-                                    current_time: datetime = None) -> List[Dict[str, Any]]:
-        """Generate prioritized daily schedule for user"""
-        if current_time is None:
-            current_time = datetime.now()
+        task_type = task.get('task_type', 'general')
+        type_score = task_type_weights.get(task_type, 0.3)
+        score += type_score * 0.2
         
+        # 3. Subject performance factor (20% weight)
+        subject_id = task.get('subject_id')
+        if subject_id and subject_id in user_stats:
+            stats = user_stats[subject_id]
+            # If user struggles with this subject (high difficulty), prioritize it
+            avg_difficulty = stats.get('avg_difficulty', 3)
+            if avg_difficulty >= 4:
+                performance_score = 0.9
+            elif avg_difficulty >= 3:
+                performance_score = 0.7
+            else:
+                performance_score = 0.5
+            
+            # Boost if subject hasn't been studied recently
+            study_days = stats.get('study_days', 0)
+            if study_days == 0:
+                performance_score = 1.0
+            elif study_days < 3:
+                performance_score = min(1.0, performance_score + 0.2)
+        else:
+            performance_score = 0.7  # New subject, moderate priority
+        score += performance_score * 0.2
+        
+        # 4. Estimated time factor (10% weight)
+        estimated_time = task.get('estimated_time', 60)
+        if estimated_time <= 30:
+            time_score = 0.8  # Quick tasks are good for momentum
+        elif estimated_time <= 60:
+            time_score = 0.6
+        elif estimated_time <= 120:
+            time_score = 0.4
+        else:
+            time_score = 0.3  # Very long tasks might need to be broken down
+        score += time_score * 0.1
+        
+        # 5. Random small factor to break ties (10% weight)
+        score += np.random.uniform(0, 0.3) * 0.1
+        
+        return min(1.0, score)  # Cap at 1.0
+    
+    def generate_recommendation_reason(self, task: Dict, score: float) -> str:
+        """Generate a human-readable reason for task recommendation."""
+        reasons = []
+        
+        # Check urgency
+        days_until_due = task.get('days_until_due', 30)
+        if days_until_due <= 1:
+            reasons.append("⚠️ Due tomorrow!")
+        elif days_until_due <= 3:
+            reasons.append("📅 Due in " + str(days_until_due) + " days")
+        elif days_until_due <= 7:
+            reasons.append("📆 Due this week")
+        
+        # Check task type
+        task_type = task.get('task_type', 'general')
+        if task_type == 'exam':
+            reasons.append("📝 Exam preparation")
+        elif task_type == 'assignment':
+            reasons.append("📚 Assignment deadline")
+        elif task_type == 'project':
+            reasons.append("🎯 Project work")
+        
+        # Check estimated time
+        estimated_time = task.get('estimated_time', 60)
+        if estimated_time <= 30:
+            reasons.append("⚡ Quick win (~" + str(estimated_time) + " min)")
+        elif estimated_time >= 120:
+            reasons.append("⏰ Needs dedicated time block")
+        
+        # Add score-based reason if no other reasons
+        if not reasons:
+            if score >= 0.8:
+                reasons.append("🔥 High priority task")
+            elif score >= 0.6:
+                reasons.append("✨ Important for progress")
+            else:
+                reasons.append("📌 Good to complete soon")
+        
+        return " • ".join(reasons)
+    
+    async def generate_daily_schedule(self, user_id: int, max_tasks: int = 5):
+        """Generate optimized daily schedule."""
         print(f"Generating schedule for user {user_id}")
         
         try:
-            # Get user's subject statistics
-            subject_stats = await self.get_user_subject_stats(user_id)
-            print(f"Found stats for {len(subject_stats)} subjects")
-            
             # Get pending tasks
             pending_tasks = await self.get_pending_tasks(user_id)
-            print(f"Found {len(pending_tasks)} pending tasks")
             
             if not pending_tasks:
                 print("No pending tasks found")
                 return []
             
-            # Calculate priority for each task
-            prioritized_tasks = []
+            # Get user stats for personalization
+            user_stats = await self.get_user_stats(user_id)
+            print(f"Found stats for {len(user_stats)} subjects")
+            
+            # Calculate priority scores
+            scored_tasks = []
             for task in pending_tasks:
-                try:
-                    task_subject_stats = subject_stats.get(task['subject_id'], {
-                        'avg_difficulty': 3.0,
-                        'recent_difficulty': 3.0,
-                        'last_studied': None
-                    })
-                    
-                    priority_info = self.calculate_task_priority(task, task_subject_stats, current_time)
-                    prioritized_tasks.append(priority_info)
-                    
-                except Exception as e:
-                    print(f"Error processing task {task['id']}: {e}")
-                    continue
+                score = self.calculate_priority_score(task, user_stats)
+                reason = self.generate_recommendation_reason(task, score)
+                
+                # Calculate predicted time (for now, use estimated time with small adjustment)
+                estimated_time = task.get('estimated_time', 60)
+                subject_id = task.get('subject_id')
+                
+                # Adjust based on user's historical performance
+                if subject_id and subject_id in user_stats:
+                    avg_actual = user_stats[subject_id].get('avg_actual_duration', estimated_time)
+                    # Weighted average: 70% estimated, 30% historical
+                    predicted_time = int(0.7 * estimated_time + 0.3 * avg_actual)
+                else:
+                    predicted_time = estimated_time
+                
+                scored_tasks.append({
+                    'task_id': task['task_id'],
+                    'task_name': task['task_name'],
+                    'subject_name': task['subject_name'],
+                    'estimated_time': estimated_time,
+                    'predicted_time': predicted_time,
+                    'priority_score': round(score, 3),
+                    'recommendation_reason': reason
+                })
             
-            # Sort by priority score (descending)
-            prioritized_tasks.sort(key=lambda x: x['priority_score'], reverse=True)
+            # Sort by priority score and select top tasks
+            scored_tasks.sort(key=lambda x: x['priority_score'], reverse=True)
+            schedule = scored_tasks[:max_tasks]
             
-            # Return top tasks
-            result = prioritized_tasks[:max_tasks]
-            print(f"Returning {len(result)} prioritized tasks")
-            return result
+            # Log generated schedule
+            print(f"Generated schedule with {len(schedule)} tasks")
+            for i, task in enumerate(schedule, 1):
+                print(f"  {i}. {task['task_name']} - Score: {task['priority_score']:.3f}")
+            
+            return schedule
             
         except Exception as e:
             print(f"Error in generate_daily_schedule: {e}")
-            raise
+            import traceback
+            traceback.print_exc()
+            return []
     
-    def optimize_schedule_by_time(self, prioritized_tasks: List[Dict[str, Any]], 
-                                available_hours: float = 8.0) -> List[Dict[str, Any]]:
-        """Optimize schedule to fit within available time"""
-        optimized_schedule = []
-        total_time = 0
-        
-        for task in prioritized_tasks:
-            estimated_minutes = task['estimated_time']
-            estimated_hours = estimated_minutes / 60
+    async def get_study_insights(self, user_id: int) -> Dict:
+        """Generate study insights for a user."""
+        try:
+            insights_query = """
+                SELECT 
+                    COUNT(DISTINCT ss.id) AS total_sessions,
+                    SUM(ss.actual_duration) AS total_minutes,
+                    AVG(ss.actual_duration) AS avg_session_duration,
+                    AVG(ss.user_difficulty_rating) AS avg_difficulty,
+                    EXTRACT(HOUR FROM ss.completed_at) AS study_hour,
+                    EXTRACT(DOW FROM ss.completed_at) AS study_day,
+                    COUNT(DISTINCT DATE(ss.completed_at)) AS total_study_days
+                FROM study_sessions ss
+                WHERE ss.user_id = $1
+                AND ss.completed_at >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY EXTRACT(HOUR FROM ss.completed_at), EXTRACT(DOW FROM ss.completed_at)
+                ORDER BY COUNT(*) DESC
+            """
             
-            if total_time + estimated_hours <= available_hours:
-                optimized_schedule.append(task)
-                total_time += estimated_hours
-            else:
-                break
-        
-        return optimized_schedule
-    
-    def get_schedule_insights(self, schedule: List[Dict[str, Any]]) -> List[str]:
-        """Generate insights about the recommended schedule"""
-        if not schedule:
+            await self.init()
+            async with self.pool.acquire() as conn:
+ 
+                rows = await conn.fetch(insights_query, user_id)
+                
+                if not rows:
+                    return {
+                        'total_study_time_hours': 0,
+                        'best_productivity_hour': 14,  # Default to 2 PM
+                        'most_productive_day': 'Monday',
+                        'estimation_accuracy': 0.5,
+                        'recommendations': ['Start tracking your study sessions to get personalized insights!']
+                    }
+                
+                # Calculate insights
+                total_minutes = sum(row['total_minutes'] or 0 for row in rows)
+                best_hour = rows[0]['study_hour'] if rows else 14
+                best_day = rows[0]['study_day'] if rows else 1
+                
+                day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+                
+                recommendations = []
+                if total_minutes < 300:  # Less than 5 hours in 30 days
+                    recommendations.append("Try to increase your study time gradually")
+                if best_hour < 9 or best_hour > 21:
+                    recommendations.append("Consider studying during peak focus hours (9 AM - 9 PM)")
+                
+                return {
+                    'total_study_time_hours': round(total_minutes / 60, 1),
+                    'best_productivity_hour': int(best_hour),
+                    'most_productive_day': day_names[int(best_day)],
+                    'estimation_accuracy': 0.75,  # Placeholder
+                    'recommendations': recommendations if recommendations else ['Keep up the great work!']
+                }
+                
+        except Exception as e:
+            print(f"Error getting study insights: {e}")
+            return {
+                'total_study_time_hours': 0,
+                'best_productivity_hour': 14,
+                'most_productive_day': 'Monday',
+                'estimation_accuracy': 0.5,
+                'recommendations': ['Unable to generate insights at this time']
+            }
+            
+    def get_schedule_insights(self, schedule_data):
+        if not schedule_data:
             return ["No tasks available for scheduling"]
-        
-        total_tasks = len(schedule)
-        total_time = sum(task['estimated_time'] for task in schedule) / 60  # hours
-        avg_priority = np.mean([task['priority_score'] for task in schedule])
-        
-        # Subject distribution
-        subjects = {}
-        for task in schedule:
-            subject = task['subject_name']
-            subjects[subject] = subjects.get(subject, 0) + 1
-        
-        # Urgency analysis
-        urgent_tasks = len([t for t in schedule if t['urgency_score'] > 0.7])
-        difficult_tasks = len([t for t in schedule if t['difficulty_score'] > 0.6])
-        
-        insights = []
-        
-        insights.append(f"Total: {total_tasks} tasks, {round(total_time, 1)} hours estimated")
-        
-        if urgent_tasks > 0:
-            insights.append(f"{urgent_tasks} urgent task(s) with approaching deadlines")
-        
-        if difficult_tasks > 0:
-            insights.append(f"{difficult_tasks} challenging task(s) scheduled for high productivity time")
-        
-        if subjects:
-            most_common_subject = max(subjects, key=subjects.get)
-            insights.append(f"Focus area: {most_common_subject} ({subjects[most_common_subject]} tasks)")
-        
-        return insights
-    
-    def update_weights(self, new_weights: Dict[str, float]):
-        """Update scoring weights"""
-        total_weight = sum(new_weights.values())
-        if abs(total_weight - 1.0) > 0.01:
-            raise ValueError(f"Weights must sum to 1.0, got {total_weight}")
-        
-        self.weights.update(new_weights)
-        print(f"Updated weights: {self.weights}")
 
-# Example usage
-async def test_priority_scorer():
-    """Test the priority scoring system"""
-    import os
-    from dotenv import load_dotenv
-    
-    load_dotenv()
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    
-    scorer = PriorityScorer(DATABASE_URL)
-    
-    # Test with user ID 1
-    user_id = 1
-    schedule = await scorer.generate_daily_schedule(user_id, max_tasks=5)
-    
-    print(f"\nDaily Schedule for User {user_id}:")
-    print("-" * 80)
-    
-    for i, task in enumerate(schedule, 1):
-        print(f"{i}. {task['task_name']} ({task['subject_name']})")
-        print(f"   Priority: {task['priority_score']:.3f} | "
-              f"Due: {task['days_until_due']} days | "
-              f"Est. Time: {task['estimated_time']} min")
-        print(f"   Urgency: {task['urgency_score']:.2f} | "
-              f"Difficulty: {task['difficulty_score']:.2f} | "
-              f"Forgetting: {task['forgetting_score']:.2f}")
-        print()
-    
-    # Get insights
-    insights = scorer.get_schedule_insights(schedule)
-    print("Schedule Insights:")
-    for insight in insights:
-        print(f"- {insight}")
+        total_time = sum(task.get('estimated_time', 0) for task in schedule_data)
+        high_priority_count = sum(1 for task in schedule_data if task.get('priority_score', 0) > 0.7)
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(test_priority_scorer())
+        return [
+            f"Total estimated time: {total_time} minutes",
+            f"High priority tasks: {high_priority_count}",
+            f"Tasks scheduled: {len(schedule_data)}"
+        ]

@@ -194,7 +194,7 @@ async def generate_schedule(
 
         return schema.DailySchedule(
     schedule=formatted_schedule,
-    insights={"insights": insights},  # Wrap the list in a dict
+    insights=insights,  # Wrap the list in a dict
     generated_at=datetime.now()
 )
         
