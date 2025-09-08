@@ -15,6 +15,7 @@ class TaskStatus(str, Enum):
     pending = "pending"
     complete = "complete"
     cancelled = "cancelled"
+    in_progress = "in_progress" # <-- ADD THIS LINE
 
 class TaskType(str, Enum):
     reading = "reading"
@@ -25,6 +26,10 @@ class TaskType(str, Enum):
     review = "review"
     general = "general"
 
+
+# Add this new class at the end of the Task Schemas section
+class TaskStatusUpdate(BaseModel):
+    status: TaskStatus
 # ==============================================================================
 # 2. Core Schemas (User, Auth, Subject, Task)
 # ==============================================================================

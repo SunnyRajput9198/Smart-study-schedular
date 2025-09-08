@@ -72,6 +72,9 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <div className="flex items-center gap-4">
             {/* ADD THIS NEW LINK */}
+            <Link href="/tasks/board" className="px-4 py-2 font-semibold text-white bg-teal-600 rounded-md hover:bg-teal-700">
+              Task Board
+            </Link>
             <Link href="/analytics" className="px-4 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700">
               Analytics
             </Link>
