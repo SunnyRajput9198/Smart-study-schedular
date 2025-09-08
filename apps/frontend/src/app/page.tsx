@@ -8,7 +8,7 @@ import apiClient from '../api/axios';
 import AddSubjectForm from '../components/AddSubjectform';
 import SmartSchedule from '../components/SmartSchedulat';
 import Link from 'next/link';
-
+import PomodoroTimer from '../components/PomodoroTimer';
 interface Subject {
   id: number;
   name: string;
@@ -91,6 +91,7 @@ export default function DashboardPage() {
         </header>
 
         <main>
+          <PomodoroTimer />
           <SmartSchedule />
           <AddSubjectForm onSubjectAdded={handleSubjectAdded} />
 

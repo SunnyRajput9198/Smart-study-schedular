@@ -125,3 +125,18 @@ class MLModel(Base):
     trained_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=False)
     performance_metrics = Column(Text)  # JSON object with metrics like MSE, R2, etc.
+    
+    
+class PomodoroSession(Base):
+    __tablename__ = "pomodoro_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    start_time = Column(DateTime, default=datetime.utcnow)
+    end_time = Column(DateTime, default=datetime.utcnow)
+    duration = Column(Integer)  # Duration in minutes
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True) # Can be null if it's a general session
+
+    owner = relationship("User")
+    task = relationship("Task")

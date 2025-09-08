@@ -189,3 +189,13 @@ class WeeklyStreak(BaseModel):
     longest_streak: int
     # This will be a dictionary like {"2025-09-01": 120, "2025-09-02": 90}
     daily_summary: Dict[str, int]
+    
+# ==============================================================================
+# 6. Pomodoro Schemas
+# ==============================================================================
+
+class PomodoroSessionCreate(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    duration: int
+    task_id: Optional[int] = None
