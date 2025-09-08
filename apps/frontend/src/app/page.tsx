@@ -71,6 +71,10 @@ export default function DashboardPage() {
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <div className="flex items-center gap-4">
+            {/* ADD THIS NEW LINK */}
+            <Link href="/analytics" className="px-4 py-2 font-semibold text-white bg-purple-600 rounded-md hover:bg-purple-700">
+              Analytics
+            </Link>
             <Link href="/history" className="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
               View History
             </Link>

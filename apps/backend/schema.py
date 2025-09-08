@@ -166,3 +166,21 @@ class MLStatus(BaseModel):
     services_available: bool
     last_training_time: Optional[datetime] = None
     active_model_version: Optional[str] = None
+    
+# ==============================================================================
+# 5. Analytics Schemas (for Dashboard Charts)
+# ==============================================================================
+
+class SubjectAnalytics(BaseModel):
+    subject_name: str
+    total_minutes_studied: int
+
+class DailyAnalytics(BaseModel):
+    tasks_planned: int
+    tasks_completed: int
+
+class WeeklyStreak(BaseModel):
+    streak_days: int
+    longest_streak: int
+    # This will be a dictionary like {"2025-09-01": 120, "2025-09-02": 90}
+    daily_summary: Dict[str, int]
