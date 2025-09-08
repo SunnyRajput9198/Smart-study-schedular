@@ -200,8 +200,7 @@ class FeatureEngineer:
         now = datetime.now()
         df['hour_of_day'] = now.hour
         df['day_of_week'] = now.weekday()
-        df['is_weekend'] = (now.weekday() >= 5).astype(int)
-        
+        df['is_weekend'] = int(now.weekday() >= 5)
         # Calculate days until due
         df['due_date'] = pd.to_datetime(df['due_date'])
         df['days_until_due'] = (df['due_date'] - now).dt.days

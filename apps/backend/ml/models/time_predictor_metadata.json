@@ -1,0 +1,14 @@
+{
+  "feature_names": [
+    "estimated_time",
+    "subject_id_encoded",
+    "hour_of_day",
+    "day_of_week",
+    "is_weekend",
+    "subject_avg_difficulty",
+    "subject_avg_time_ratio",
+    "user_avg_time_ratio",
+    "days_until_due"
+  ],
+  "is_trained": true
+}

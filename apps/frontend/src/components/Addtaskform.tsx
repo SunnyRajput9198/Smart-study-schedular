@@ -1,11 +1,12 @@
+// apps/frontend/src/components/AddTaskForm.tsx
 'use client';
 
 import { useState, FormEvent } from 'react';
 import apiClient from '../api/axios';
-import { Task } from '../app/subjects/[subjectId]/page'; // Import the Task type
+import { Task } from '../app/subjects/[subjectId]/page'; // We will export the Task type from the page
 
 interface Props {
-  subjectId: string ;
+  subjectId: string | string[];
   onTaskAdded: (newTask: Task) => void;
 }
 
@@ -33,10 +34,11 @@ export default function AddTaskForm({ subjectId, onTaskAdded }: Props) {
 
       const response = await apiClient.post(`/tasks/${subjectId}`, taskData);
       
-      // Call the function passed from the parent page to update the task list instantly
+      // This is the callback function. It tells the parent page (SubjectDetailPage)
+      // to add the new task to its list instantly, without a page refresh.
       onTaskAdded(response.data);
 
-      // Reset the form
+      // Reset the form for the next entry
       setTitle('');
       setEstimatedTime('');
       setDeadline('');
