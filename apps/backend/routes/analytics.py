@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func,Date
+from sqlalchemy import func,Date,text
 from typing import List, Dict
 from datetime import datetime, timedelta
 import models, schema, security
@@ -128,3 +128,98 @@ def get_weekly_streak(
         longest_streak=longest_streak,
         daily_summary=daily_summary
     )
+    
+    
+# Add this new function to the end of apps/backend/routers/analytics.py
+
+# In apps/backend/routers/analytics.py, replace the get_recommendations function with this:
+
+@router.get("/recommendations", response_model=schema.InsightsResponse)
+def get_recommendations(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """
+    Analyzes the user's study history to generate personalized AI insights
+    and recommendations.
+    """
+    recommendations = []
+    
+    # --- Insight 1: Productivity by Time of Day ---
+    try:
+        time_of_day_query = db.execute(text(f"""
+            SELECT
+                CASE
+                    WHEN EXTRACT(hour FROM ss.completed_at) BETWEEN 7 AND 12 THEN 'Morning'
+                    WHEN EXTRACT(hour FROM ss.completed_at) BETWEEN 13 AND 17 THEN 'Afternoon'
+                    ELSE 'Evening'
+                END as period,
+                AVG(t.estimated_time::float / NULLIF(ss.actual_duration, 0)::float) as efficiency
+            FROM study_sessions ss
+            JOIN tasks t ON ss.task_id = t.id
+            WHERE ss.user_id = {current_user.id} AND ss.actual_duration > 0
+            GROUP BY period
+            ORDER BY efficiency DESC
+            LIMIT 1;
+        """)).first()
+
+        if time_of_day_query and time_of_day_query.efficiency > 1.1:
+            recommendations.append(
+                f"You're most efficient in the {time_of_day_query.period.lower()}. Try scheduling your hardest tasks then!"
+            )
+    except Exception as e:
+        print(f"Could not generate time-of-day insight: {e}")
+
+    # --- Insight 2: Estimation Accuracy by Subject ---
+    try:
+        # THE FIX: Replaced the alias 'avg_difference' in ORDER BY with the full calculation.
+        estimation_accuracy_query = db.execute(text(f"""
+            SELECT
+                s.name as subject_name,
+                AVG(ss.actual_duration::float - t.estimated_time::float) as avg_difference
+            FROM study_sessions ss
+            JOIN tasks t ON ss.task_id = t.id
+            JOIN subjects s ON t.subject_id = s.id
+            WHERE ss.user_id = {current_user.id}
+            GROUP BY s.name
+            ORDER BY ABS(AVG(ss.actual_duration::float - t.estimated_time::float)) DESC
+            LIMIT 1;
+        """)).first()
+
+        if estimation_accuracy_query:
+            if estimation_accuracy_query.avg_difference > 15:
+                recommendations.append(
+                    f"You tend to underestimate your time for '{estimation_accuracy_query.subject_name}'. Try adding a 15-minute buffer."
+                )
+            elif estimation_accuracy_query.avg_difference < -15:
+                recommendations.append(
+                    f"You are faster than you think at '{estimation_accuracy_query.subject_name}'! You might be overestimating."
+                )
+    except Exception as e:
+        print(f"Could not generate estimation accuracy insight: {e}")
+            
+    # --- Insight 3: Spaced Repetition (Forgetting Curve) ---
+    try:
+        spaced_repetition_query = db.execute(text(f"""
+            SELECT s.name as subject_name, MAX(ss.completed_at) as last_studied
+            FROM subjects s
+            JOIN tasks t ON s.id = t.subject_id
+            JOIN study_sessions ss ON t.id = ss.task_id
+            WHERE s.user_id = {current_user.id}
+            GROUP BY s.name
+            HAVING (NOW() - MAX(ss.completed_at)) > INTERVAL '5 days'
+            ORDER BY last_studied ASC
+            LIMIT 1;
+        """)).first()
+
+        if spaced_repetition_query:
+            recommendations.append(
+                f"You haven't reviewed '{spaced_repetition_query.subject_name}' in a while. Consider studying it soon."
+            )
+    except Exception as e:
+        print(f"Could not generate spaced repetition insight: {e}")
+
+    if not recommendations:
+        recommendations.append("Keep completing tasks to unlock more personalized insights!")
+
+    return schema.InsightsResponse(recommendations=recommendations)

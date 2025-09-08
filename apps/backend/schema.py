@@ -199,3 +199,8 @@ class PomodoroSessionCreate(BaseModel):
     end_time: datetime
     duration: int
     task_id: Optional[int] = None
+    
+# Add this new class to the end of apps/backend/schemas.py
+
+class InsightsResponse(BaseModel):
+    recommendations: List[str]

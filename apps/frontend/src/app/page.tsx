@@ -9,6 +9,7 @@ import AddSubjectForm from '../components/AddSubjectform';
 import SmartSchedule from '../components/SmartSchedulat';
 import Link from 'next/link';
 import PomodoroTimer from '../components/PomodoroTimer';
+import AIInsights from '../components/AIInsight';
 interface Subject {
   id: number;
   name: string;
@@ -92,6 +93,7 @@ export default function DashboardPage() {
 
         <main>
           <PomodoroTimer />
+          <AIInsights />
           <SmartSchedule />
           <AddSubjectForm onSubjectAdded={handleSubjectAdded} />
 
