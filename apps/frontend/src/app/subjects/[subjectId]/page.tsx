@@ -8,6 +8,12 @@ import AddTaskForm from '../../../components/Addtaskform';
 import CompletionModal from '../../../components/CompletionModel';
 
 // Interfaces for our data shapes
+// Add this simple Subject interface right before the Task interface
+interface Subject {
+  id: number;
+  name: string;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -15,6 +21,7 @@ export interface Task {
   estimated_time: number;
   deadline: string | null;
   predicted_time?: number;
+  subject: Subject;
 }
 
 interface Subject {

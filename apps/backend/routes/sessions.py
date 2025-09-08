@@ -1,7 +1,6 @@
 # backend/routers/sessions.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
+from sqlalchemy.orm import Session,joinedload
 # Note the relative imports to work with our organized structure
 import schema, models, security
 from database import get_db
@@ -52,3 +51,28 @@ def complete_task_and_log_session(
     
     return task
 
+
+# Add this new function to apps/backend/routers/sessions.py
+
+@router.get("/", response_model=list[schema.StudySession])
+def get_session_history(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user),
+    skip: int = 0,
+    limit: int = 100
+):
+    """
+    Retrieve all past study sessions for the logged-in user.
+    """
+    sessions = (
+        db.query(models.StudySession)
+        .filter(models.StudySession.user_id == current_user.id)
+        .options(
+            joinedload(models.StudySession.task).joinedload(models.Task.subject)
+        )
+        .order_by(models.StudySession.completed_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return sessions

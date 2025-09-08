@@ -18,7 +18,7 @@ interface Subject {
 export default function DashboardPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // THE FIX: Select state primitives or functions individually.
   // This prevents the hook from returning a new object on every render,
   // which was causing the infinite loop.
@@ -52,10 +52,10 @@ export default function DashboardPage() {
     };
 
     fetchSubjects();
-  // The useEffect will now re-run whenever isLoggedIn changes.
-  // The page loads -> isLoggedIn is false. Zustand loads token -> isLoggedIn becomes true -> This effect runs again, safely fetching the data.
-  }, [isLoggedIn]); 
-  
+    // The useEffect will now re-run whenever isLoggedIn changes.
+    // The page loads -> isLoggedIn is false. Zustand loads token -> isLoggedIn becomes true -> This effect runs again, safely fetching the data.
+  }, [isLoggedIn]);
+
   const handleSubjectAdded = (newSubject: Subject) => {
     setSubjects((prevSubjects) => [...prevSubjects, newSubject]);
   };
@@ -70,12 +70,17 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-900 text-white p-4 sm:p-8">
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 font-semibold bg-red-600 rounded-md hover:bg-red-700"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            <Link href="/history" className="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
+              View History
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 font-semibold bg-red-600 rounded-md hover:bg-red-700"
+            >
+              Logout
+            </button>
+          </div>
         </header>
 
         <main>

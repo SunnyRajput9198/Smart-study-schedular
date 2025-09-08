@@ -97,6 +97,7 @@ class Task(TaskBase):
     subject_id: int
     status: TaskStatus
     created_at: datetime
+    subject: Optional[Subject] = None
     
     class Config:
         from_attributes = True
@@ -121,6 +122,7 @@ class StudySession(StudySessionBase):
     task_id: int
     user_id: int
     completed_at: datetime
+    task: Task
     
     class Config:
         from_attributes = True
