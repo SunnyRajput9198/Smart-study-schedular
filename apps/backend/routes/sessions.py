@@ -11,7 +11,7 @@ router = APIRouter(
     tags=["Study Sessions"]
 )
 
-@router.post("/{task_id}/complete", response_model=schema.StudySession)
+@router.post("/{task_id}/complete", response_model=schema.Task)
 def complete_task_and_log_session(
     task_id: int,
     session_data: schema.StudySessionCreate,
@@ -48,6 +48,7 @@ def complete_task_and_log_session(
     
     # 4. Commit all changes to the database.
     db.commit()
-    db.refresh(new_session)
+    db.refresh(task)
     
-    return new_session
+    return task
+

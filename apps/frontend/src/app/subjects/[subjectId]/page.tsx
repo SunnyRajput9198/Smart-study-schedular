@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import apiClient from '../../../api/axios';
 import AddTaskForm from '../../../components/Addtaskform';
+import CompletionModal from '../../../components/CompletionModel';
 
 // Interfaces for our data shapes
 export interface Task {
@@ -27,6 +28,7 @@ export default function SubjectDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPredicting, setIsPredicting] = useState(false); // State for AI prediction loading
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null); // <-- ADD THIS LINE
   useEffect(() => {
     if (!subjectId) return;
     const fetchSubjectDetails = async () => {
@@ -89,6 +91,17 @@ export default function SubjectDetailPage() {
   const handleTaskAdded = (newTask: Task) => {
     setTasks((prevTasks) => [...prevTasks, newTask]);
   };
+  // Replace handleTaskCompleted with this
+const handleSessionSaved = (completedTask: Task) => {
+  // First, update the task's status in the UI
+  setTasks(currentTasks => 
+    currentTasks.map(task => 
+      task.id === completedTask.id ? { ...task, status: 'completed' } : task
+    )
+  );
+  // THEN, close the modal
+  setSelectedTask(null);
+};
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-white">
@@ -156,35 +169,33 @@ export default function SubjectDetailPage() {
           <div className="space-y-4">
             {tasks.length > 0 ? (
               tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 bg-gray-800 rounded-lg flex justify-between items-center"
-                >
+                // --- REPLACE THE OLD DIV WITH THIS NEW ONE ---
+                <div key={task.id} className="p-4 bg-gray-800 rounded-lg flex justify-between items-center">
                   <div>
                     <span className="text-lg font-bold">{task.title}</span>
-                    <p className="text-sm text-gray-400">
-                      Estimated: {task.estimated_time} mins
-                    </p>
-                    {/* ADD THIS SNIPPET START */}
-                    {task.predicted_time && (
-                      <p className="text-sm text-indigo-300">
-                        AI Predicts: <strong>{task.predicted_time} mins</strong>
-                      </p>
-                    )}
-                    {/* ADD THIS SNIPPET END */}
-                    {task.deadline && (
-                      <p className="text-sm text-gray-400">
-                        Deadline: {new Date(task.deadline).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                      <span>Your Estimate: <strong>{task.estimated_time} mins</strong></span>
+                      {task.predicted_time && (
+                        <span className="text-indigo-300">| AI Predicts: <strong>{task.predicted_time} mins</strong></span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`px-3 py-1 text-sm rounded-full text-white ${task.status === 'pending' ? 'bg-yellow-500' : 'bg-green-500'}`}>
+                      {task.status}
+                    </span>
+                    {/* This button only shows for pending tasks */}
+                    {task.status === 'pending' && (
+                      <button
+                        onClick={() => setSelectedTask(task)}
+                        className="px-3 py-1 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700"
+                      >
+                        ✓ Complete
+                      </button>
                     )}
                   </div>
-                  <span
-                    className={`px-3 py-1 text-sm rounded-full text-white ${task.status === 'pending' ? 'bg-yellow-500' : 'bg-green-500'
-                      }`}
-                  >
-                    {task.status}
-                  </span>
                 </div>
+                // --- END OF REPLACEMENT ---
               ))
             ) : (
               <p>No tasks found for this subject yet. Add one above to get started!</p>
@@ -192,6 +203,16 @@ export default function SubjectDetailPage() {
           </div>
         </main>
       </div>
+      {/* ADD THIS SNIPPET START */}
+    // Replace the old CompletionModal with this
+{selectedTask && (
+  <CompletionModal 
+    task={selectedTask}
+    onClose={() => setSelectedTask(null)}
+    onSessionSaved={handleSessionSaved}
+  />
+)}
+      {/* ADD THIS SNIPPET END */}
     </ProtectedRoute>
   );
 
