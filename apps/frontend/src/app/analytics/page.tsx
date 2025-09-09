@@ -26,128 +26,69 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { TrendingUp, Clock, Target, BookOpen, Calendar, Award, Zap } from "lucide-react"
 
+// --- YEH PURA BLOCK PASTE KAREIN ---
 interface SubjectAnalytics {
-  subject_name: string
-  total_minutes_studied: number
-  sessions_count?: number
-  avg_session_duration?: number
+  subject_name: string;
+  total_minutes_studied: number;
+  sessions_count: number;
+  avg_session_duration: number;
 }
 
 interface DailyAnalytics {
-  tasks_planned: number
-  tasks_completed: number
-  completion_rate?: number
-  focus_time?: number
+  tasks_planned: number;
+  tasks_completed: number;
+  completion_rate: number;
+  focus_time: number;
 }
 
 interface WeeklyStreak {
-  streak_days: number
-  daily_summary: Record<string, number>
-  weekly_goal?: number
-  total_weekly_minutes?: number
+  streak_days: number;
+  daily_summary: Record<string, number>;
+  weekly_goal: number;
+  total_weekly_minutes: number;
 }
 
 interface PerformanceMetrics {
-  productivity_score: number
-  focus_sessions: number
-  average_session_quality: number
-  improvement_trend: number
+  productivity_score: number;
+  focus_sessions: number;
+  average_session_quality: number;
+  improvement_trend: number;
 }
 
+interface AnalyticsSummary {
+  subjects: SubjectAnalytics[];
+  daily: DailyAnalytics;
+  weekly: WeeklyStreak;
+  performance: PerformanceMetrics;
+}
+// --- YAHAN TAK PASTE KAREIN ---
+
+
+
 export default function AnalyticsPage() {
-  const [subjectData, setSubjectData] = useState<SubjectAnalytics[]>([])
-  const [dailyData, setDailyData] = useState<DailyAnalytics | null>(null)
-  const [weeklyData, setWeeklyData] = useState<WeeklyStreak | null>(null)
-  const [performanceData, setPerformanceData] = useState<PerformanceMetrics | null>(null)
+  const [summaryData, setSummaryData] = useState<AnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      setIsLoading(true)
-      try {
-        const [subjectRes, dailyRes, weeklyRes] = await Promise.all([
-          apiClient.get("/analytics/subjects").catch(() => ({ data: mockSubjectData })),
-          apiClient.get("/analytics/daily").catch(() => ({ data: mockDailyData })),
-          apiClient.get("/analytics/weekly").catch(() => ({ data: mockWeeklyData })),
-        ])
-
-        setSubjectData(subjectRes.data)
-        setDailyData(dailyRes.data)
-        setWeeklyData(weeklyRes.data)
-        setPerformanceData(mockPerformanceData)
-      } catch (error) {
-        console.error("Failed to fetch analytics data:", error)
-        setSubjectData(mockSubjectData)
-        setDailyData(mockDailyData)
-        setWeeklyData(mockWeeklyData)
-        setPerformanceData(mockPerformanceData)
-      } finally {
-        setIsLoading(false)
-      }
+// --- PURAANA useEffect ISSE REPLACE KAREIN ---
+useEffect(() => {
+  const fetchAnalyticsSummary = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get("/analytics/summary");
+      setSummaryData(response.data);
+    } catch (error) {
+      console.error("Failed to fetch analytics summary:", error);
+      // Agar error aaye to mock data use karein
+      setSummaryData(null
+      );
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    fetchAnalytics()
-  }, [])
-
-  const mockSubjectData = [
-    { subject_name: "Mathematics", total_minutes_studied: 420, sessions_count: 12, avg_session_duration: 35 },
-    { subject_name: "Physics", total_minutes_studied: 380, sessions_count: 10, avg_session_duration: 38 },
-    { subject_name: "Chemistry", total_minutes_studied: 290, sessions_count: 8, avg_session_duration: 36 },
-    { subject_name: "Biology", total_minutes_studied: 340, sessions_count: 9, avg_session_duration: 38 },
-    { subject_name: "Computer Science", total_minutes_studied: 480, sessions_count: 15, avg_session_duration: 32 },
-  ]
-
-  const mockDailyData = {
-    tasks_planned: 8,
-    tasks_completed: 6,
-    completion_rate: 75,
-    focus_time: 240,
-  }
-
-  const mockWeeklyData = {
-    streak_days: 5,
-    daily_summary: {
-      "2024-01-15": 45,
-      "2024-01-16": 60,
-      "2024-01-17": 38,
-      "2024-01-18": 72,
-      "2024-01-19": 55,
-      "2024-01-20": 48,
-      "2024-01-21": 65,
-    },
-    weekly_goal: 350,
-    total_weekly_minutes: 383,
-  }
-
-  const mockPerformanceData = {
-    productivity_score: 87,
-    focus_sessions: 23,
-    average_session_quality: 4.2,
-    improvement_trend: 12,
-  }
-
-  const weeklyChartData = weeklyData
-    ? Object.entries(weeklyData.daily_summary)
-        .map(([day, minutes]) => ({
-          day: new Date(day).toLocaleDateString("en-US", { weekday: "short" }),
-          minutes: minutes,
-          date: day,
-        }))
-        .reverse()
-    : []
-
-  const subjectPieData = subjectData.map((subject, index) => ({
-    name: subject.subject_name,
-    value: subject.total_minutes_studied,
-    color: `hsl(var(--chart-${(index % 5) + 1}))`,
-  }))
-
-  const performanceChartData = [
-    { metric: "Productivity", score: performanceData?.productivity_score || 0, target: 90 },
-    { metric: "Focus Quality", score: (performanceData?.average_session_quality || 0) * 20, target: 85 },
-    { metric: "Consistency", score: weeklyData?.streak_days ? (weeklyData.streak_days / 7) * 100 : 0, target: 80 },
-    { metric: "Goal Achievement", score: dailyData?.completion_rate || 0, target: 85 },
-  ]
+  fetchAnalyticsSummary();
+}, []);
+// --- END REPLACEMENT ---
 
   if (isLoading) {
     return (
@@ -159,6 +100,35 @@ export default function AnalyticsPage() {
       </div>
     )
   }
+  // Yeh check karega ki data hai ya nahi
+if (!summaryData) {
+    return (
+         <div className="flex items-center justify-center min-h-screen">
+            <p>No analytics data found yet. Complete some tasks!</p>
+         </div>
+    )
+}
+const { subjects, daily, weekly, performance } = summaryData; // <-- YEH LINE ADD KAREIN
+// Chart ke liye data taiyaar karein
+const weeklyChartData = Object.entries(weekly.daily_summary)
+  .map(([day, minutes]) => ({
+    day: new Date(day).toLocaleDateString("en-US", { weekday: "short" }),
+    minutes: minutes,
+  }))
+  .reverse();
+
+const subjectPieData = subjects.map((subject, index) => ({
+  name: subject.subject_name,
+  value: subject.total_minutes_studied,
+  color: `hsl(var(--chart-${(index % 5) + 1}))`,
+}));
+
+const performanceChartData = [
+  { metric: "Productivity", score: performance.productivity_score, target: 90 },
+  { metric: "Focus Quality", score: performance.average_session_quality * 20, target: 85 },
+  { metric: "Consistency", score: (weekly.streak_days / 7) * 100, target: 80 },
+  { metric: "Goal Achievement", score: daily.completion_rate, target: 85 },
+];
 
   return (
     <ProtectedRoute>
@@ -177,7 +147,7 @@ export default function AnalyticsPage() {
                 <p className="text-primary-foreground/80 text-lg">Comprehensive insights into your learning journey</p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold">{weeklyData?.streak_days || 0}</div>
+                <div className="text-3xl font-bold">{weekly.streak_days || 0}</div>
                 <div className="text-sm text-primary-foreground/80">Day Streak 🔥</div>
               </div>
             </div>
@@ -193,10 +163,10 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">
-                  {dailyData?.tasks_completed || 0}/{dailyData?.tasks_planned || 0}
+                  {daily.tasks_completed || 0}/{daily.tasks_planned || 0}
                 </div>
-                <Progress value={dailyData?.completion_rate || 0} className="mt-2" />
-                <p className="text-xs text-muted-foreground mt-2">{dailyData?.completion_rate || 0}% completion rate</p>
+                <Progress value={daily.completion_rate || 0} className="mt-2" />
+                <p className="text-xs text-muted-foreground mt-2">{daily.completion_rate || 0}% completion rate</p>
               </CardContent>
             </Card>
 
@@ -206,7 +176,7 @@ export default function AnalyticsPage() {
                 <Clock className="h-4 w-4 text-chart-2" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{dailyData?.focus_time || 0}m</div>
+                <div className="text-2xl font-bold text-foreground">{daily.focus_time || 0}m</div>
                 <div className="flex items-center text-xs text-muted-foreground mt-2">
                   <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
                   +12% from yesterday
@@ -220,7 +190,7 @@ export default function AnalyticsPage() {
                 <Zap className="h-4 w-4 text-chart-3" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{performanceData?.productivity_score || 0}/100</div>
+                <div className="text-2xl font-bold text-foreground">{performance.productivity_score || 0}/100</div>
                 <Badge variant="secondary" className="mt-2">
                   Excellent
                 </Badge>
@@ -234,14 +204,14 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">
-                  {Math.round(((weeklyData?.total_weekly_minutes || 0) / (weeklyData?.weekly_goal || 1)) * 100)}%
+                  {Math.round(((weekly.total_weekly_minutes || 0) / (weekly.weekly_goal || 1)) * 100)}%
                 </div>
                 <Progress
-                  value={((weeklyData?.total_weekly_minutes || 0) / (weeklyData?.weekly_goal || 1)) * 100}
+                  value={((weekly.total_weekly_minutes || 0) / (weekly?.weekly_goal || 1)) * 100}
                   className="mt-2"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  {weeklyData?.total_weekly_minutes || 0}/{weeklyData?.weekly_goal || 0} minutes
+                  {weekly.total_weekly_minutes || 0}/{weekly.weekly_goal || 0} minutes
                 </p>
               </CardContent>
             </Card>
@@ -258,14 +228,14 @@ export default function AnalyticsPage() {
                 <CardDescription>Task completion and focus metrics</CardDescription>
               </CardHeader>
               <CardContent>
-                {dailyData && (
+                {daily && (
                   <ResponsiveContainer width="100%" height={300}>
                     <RadialBarChart
                       innerRadius="60%"
                       outerRadius="90%"
                       data={[
-                        { name: "Completed", value: dailyData.tasks_completed, fill: "hsl(var(--chart-1))" },
-                        { name: "Planned", value: dailyData.tasks_planned, fill: "hsl(var(--muted))" },
+                        { name: "Completed", value: daily.tasks_completed, fill: "hsl(var(--chart-1))" },
+                        { name: "Planned", value: daily.tasks_planned, fill: "hsl(var(--muted))" },
                       ]}
                       startAngle={90}
                       endAngle={-270}
@@ -284,13 +254,13 @@ export default function AnalyticsPage() {
                         dominantBaseline="middle"
                         className="fill-foreground text-3xl font-bold"
                       >
-                        {`${dailyData.tasks_completed}/${dailyData.tasks_planned}`}
+                        {`${daily.tasks_completed}/${daily.tasks_planned}`}
                       </text>
                     </RadialBarChart>
                   </ResponsiveContainer>
                 )}
                 <div className="text-center text-muted-foreground">
-                  Tasks completed today • {dailyData?.completion_rate || 0}% success rate
+                  Tasks completed today • {daily.completion_rate || 0}% success rate
                 </div>
               </CardContent>
             </Card>
@@ -308,7 +278,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={subjectPieData}
+                      data={subjects}
                       cx="50%"
                       cy="50%"
                       outerRadius={100}
@@ -316,8 +286,8 @@ export default function AnalyticsPage() {
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {subjectPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      {subjects.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.subject_name} />
                       ))}
                     </Pie>
                     <Tooltip
@@ -371,8 +341,8 @@ export default function AnalyticsPage() {
                   </AreaChart>
                 </ResponsiveContainer>
                 <div className="flex justify-between text-sm text-muted-foreground mt-4">
-                  <span>Total: {weeklyData?.total_weekly_minutes || 0} minutes</span>
-                  <span>Average: {Math.round((weeklyData?.total_weekly_minutes || 0) / 7)} min/day</span>
+                  <span>Total: {weekly.total_weekly_minutes || 0} minutes</span>
+                  <span>Average: {Math.round((weekly.total_weekly_minutes || 0) / 7)} min/day</span>
                 </div>
               </CardContent>
             </Card>
@@ -416,7 +386,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={subjectData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={subjects} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <XAxis dataKey="subject_name" stroke="hsl(var(--muted-foreground))" />
                   <YAxis stroke="hsl(var(--muted-foreground))" />
                   <Tooltip

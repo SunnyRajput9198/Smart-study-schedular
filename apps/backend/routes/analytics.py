@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func,Date,text
+from sqlalchemy import func, Date, text
 from typing import List, Dict
 from datetime import datetime, timedelta
 import models, schema, security
@@ -13,126 +13,110 @@ router = APIRouter(
     tags=["Analytics"]
 )
 
-@router.get("/subjects", response_model=List[schema.SubjectAnalytics])
-def get_subject_analytics(
+@router.get("/summary", response_model=schema.AnalyticsSummary)
+def get_analytics_summary(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
     """
-    Calculates the total study time (in minutes) for each subject
-    for the logged-in user. This is used for the bar chart on the dashboard.
+    Calculates a comprehensive summary of all user analytics for the main dashboard.
     """
-    analytics_data = (
-        db.query(
-            models.Subject.name,
-            func.sum(models.StudySession.actual_duration).label("total_minutes")
-        )
-        .join(models.Task, models.Subject.id == models.Task.subject_id)
-        .join(models.StudySession, models.Task.id == models.StudySession.task_id)
-        .filter(models.Subject.user_id == current_user.id)
-        .group_by(models.Subject.name)
-        .order_by(func.sum(models.StudySession.actual_duration).desc())
-        .all()
-    )
-
-    # Format the data to match our Pydantic schema
-    return [
-        schema.SubjectAnalytics(
-            subject_name=name,
-            total_minutes_studied=minutes if minutes is not None else 0
-        )
-        for name, minutes in analytics_data
-    ]
-    
-# THE FIX: ADD THIS NEW FUNCTION
-@router.get("/daily", response_model=schema.DailyAnalytics)
-def get_daily_analytics(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
-):
-    """
-    Calculates the number of tasks planned vs completed for today.
-    """
+    user_id = current_user.id
     today = datetime.utcnow().date()
+    seven_days_ago = today - timedelta(days=6)
 
-    tasks_completed = (
-        db.query(func.count(models.Task.id))
-        .join(models.StudySession, models.Task.id == models.StudySession.task_id)
-        .filter(models.Task.user_id == current_user.id)
-        .filter(func.cast(models.StudySession.completed_at, Date) == today)
-        .scalar()
-    )
-
-    tasks_planned = (
-        db.query(func.count(models.Task.id))
-        .filter(models.Task.user_id == current_user.id)
-        .filter(models.Task.status == 'pending')
-        .scalar()
-    )
-
-    return schema.DailyAnalytics(
-        tasks_planned=(tasks_planned or 0) + (tasks_completed or 0),
-        tasks_completed=tasks_completed or 0
-    )
-
-# THE FIX: ADD THIS NEW FUNCTION
-@router.get("/weekly", response_model=schema.WeeklyStreak)
-def get_weekly_streak(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(security.get_current_user)
-):
-    """
-    Calculates the user's current study streak and daily summary for the last 7 days.
-    """
-    seven_days_ago = datetime.utcnow().date() - timedelta(days=6)
-
-    daily_summary_query = (
-        db.query(
-            func.cast(models.StudySession.completed_at, Date).label("study_day"),
-            func.sum(models.StudySession.actual_duration).label("total_minutes")
-        )
-        .filter(models.StudySession.user_id == current_user.id)
-        .filter(func.cast(models.StudySession.completed_at, Date) >= seven_days_ago)
-        .group_by("study_day")
-        .order_by("study_day")
-        .all()
-    )
+    # --- 1. Subject Analytics ---
+    subject_query = db.query(
+        models.Subject.name,
+        func.sum(models.StudySession.actual_duration).label("total_minutes"),
+        func.count(models.StudySession.id).label("session_count"),
+        func.avg(models.StudySession.actual_duration).label("avg_duration")
+    ).select_from(models.StudySession).join(models.Task).join(models.Subject).filter(
+        models.Subject.user_id == user_id
+    ).group_by(models.Subject.name).all()
     
-    # Create a dictionary of the last 7 days with 0 minutes studied
-    daily_summary = {
-        (datetime.utcnow().date() - timedelta(days=i)).isoformat(): 0
-        for i in range(7)
-    }
-    # Fill in the actual minutes studied
-    for day, minutes in daily_summary_query:
-        if day:
-            daily_summary[day.isoformat()] = minutes or 0
+    subject_data = [schema.SubjectAnalytics(
+        subject_name=name,
+        total_minutes_studied=minutes or 0,
+        sessions_count=count or 0,
+        avg_session_duration=round(avg_dur or 0, 1)
+    ) for name, minutes, count, avg_dur in subject_query]
 
-    # Calculate streak
+    # --- 2. Daily Analytics ---
+    tasks_completed_today = db.query(func.count(models.Task.id)).join(models.StudySession).filter(
+        models.Task.user_id == user_id,
+        func.cast(models.StudySession.completed_at, Date) == today
+    ).scalar() or 0
+    
+    tasks_pending = db.query(func.count(models.Task.id)).filter(
+        models.Task.user_id == user_id, models.Task.status == 'pending'
+    ).scalar() or 0
+    
+    total_planned_today = tasks_completed_today + tasks_pending
+    completion_rate = (tasks_completed_today / total_planned_today * 100) if total_planned_today > 0 else 0
+    
+    focus_time_today = db.query(func.sum(models.PomodoroSession.duration)).filter(
+        models.PomodoroSession.user_id == user_id,
+        func.cast(models.PomodoroSession.start_time, Date) == today
+    ).scalar() or 0
+
+    daily_data = schema.DailyAnalytics(
+        tasks_planned=total_planned_today,
+        tasks_completed=tasks_completed_today,
+        completion_rate=round(completion_rate, 1),
+        focus_time=focus_time_today
+    )
+
+    # --- 3. Weekly Streak & Goal ---
+    daily_summary_query = db.query(
+        func.cast(models.StudySession.completed_at, Date).label("study_day"),
+        func.sum(models.StudySession.actual_duration).label("total_minutes")
+    ).filter(
+        models.StudySession.user_id == user_id,
+        func.cast(models.StudySession.completed_at, Date) >= seven_days_ago
+    ).group_by("study_day").all()
+
+    daily_summary_map = {day.isoformat(): minutes for day, minutes in daily_summary_query}
+    
     streak_days = 0
-    today = datetime.utcnow().date()
     for i in range(7):
         day_to_check = today - timedelta(days=i)
-        if daily_summary.get(day_to_check.isoformat(), 0) > 0:
+        if daily_summary_map.get(day_to_check.isoformat(), 0) > 0:
             streak_days += 1
-        else:
-            # Break streak if a day is missed (unless it's today and we're looking at past days)
-            if i > 0:
-                break
-    
-    # In a real app, longest_streak would be stored and updated in the user profile
-    longest_streak = streak_days 
+        elif i > 0:
+            break
 
-    return schema.WeeklyStreak(
+    total_weekly_minutes = sum(daily_summary_map.values())
+    weekly_data = schema.WeeklyStreak(
         streak_days=streak_days,
-        longest_streak=longest_streak,
-        daily_summary=daily_summary
+        daily_summary=daily_summary_map,
+        weekly_goal=350,  # NOTE: Hardcoded goal, can be made a user setting later
+        total_weekly_minutes=total_weekly_minutes
     )
-    
-    
-# Add this new function to the end of apps/backend/routers/analytics.py
 
-# In apps/backend/routers/analytics.py, replace the get_recommendations function with this:
+    # --- 4. Performance Metrics (Calculated) ---
+    total_focus_sessions = db.query(func.count(models.PomodoroSession.id)).filter(models.PomodoroSession.user_id == user_id).scalar() or 0
+    
+    avg_quality = db.query(func.avg(models.StudySession.user_difficulty_rating)).filter(
+        models.StudySession.user_id == user_id
+    ).scalar() or 0
+    
+    # Simple productivity score based on completion and consistency
+    productivity_score = int((completion_rate * 0.7) + (min(streak_days, 7) / 7 * 100 * 0.3))
+
+    performance_data = schema.PerformanceMetrics(
+        productivity_score=productivity_score,
+        focus_sessions=total_focus_sessions,
+        average_session_quality=round(5 - avg_quality, 1) if avg_quality > 0 else 0, # Invert so higher is better
+        improvement_trend=12.0 # NOTE: Simulated trend, a real trend needs historical data
+    )
+
+    return schema.AnalyticsSummary(
+        subjects=subject_data,
+        daily=daily_data,
+        weekly=weekly_data,
+        performance=performance_data
+    )
 
 @router.get("/recommendations", response_model=schema.InsightsResponse)
 def get_recommendations(

@@ -172,24 +172,43 @@ class MLStatus(BaseModel):
     last_training_time: Optional[datetime] = None
     active_model_version: Optional[str] = None
     
+
+# In apps/backend/schemas.py, find the "Analytics Schemas" section
+
 # ==============================================================================
 # 5. Analytics Schemas (for Dashboard Charts)
 # ==============================================================================
 
+
 class SubjectAnalytics(BaseModel):
     subject_name: str
     total_minutes_studied: int
+    sessions_count: int
+    avg_session_duration: float
 
 class DailyAnalytics(BaseModel):
     tasks_planned: int
     tasks_completed: int
+    completion_rate: float
+    focus_time: int
 
 class WeeklyStreak(BaseModel):
     streak_days: int
-    longest_streak: int
-    # This will be a dictionary like {"2025-09-01": 120, "2025-09-02": 90}
     daily_summary: Dict[str, int]
-    
+    weekly_goal: int
+    total_weekly_minutes: int
+
+class PerformanceMetrics(BaseModel):
+    productivity_score: int
+    focus_sessions: int
+    average_session_quality: float
+    improvement_trend: float
+
+class AnalyticsSummary(BaseModel):
+    subjects: List[SubjectAnalytics]
+    daily: DailyAnalytics
+    weekly: WeeklyStreak
+    performance: PerformanceMetrics
 # ==============================================================================
 # 6. Pomodoro Schemas
 # ==============================================================================
