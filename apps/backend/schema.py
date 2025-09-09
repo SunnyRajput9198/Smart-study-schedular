@@ -204,3 +204,36 @@ class PomodoroSessionCreate(BaseModel):
 
 class InsightsResponse(BaseModel):
     recommendations: List[str]
+    
+# Add this new section to the end of apps/backend/schemas.py
+
+# ==============================================================================
+# 7. History & Analytics Summary Schemas
+# ==============================================================================
+
+class HistoryStats(BaseModel):
+    total_sessions: int
+    total_hours: float
+    avg_difficulty: float
+    avg_duration: float
+
+class TimelinePoint(BaseModel):
+    date: str
+    duration: int
+    difficulty: int
+
+class SubjectDistribution(BaseModel):
+    subject: str
+    duration: int
+    sessions: int
+
+class DifficultyDistribution(BaseModel):
+    difficulty: str
+    count: int
+
+class HistorySummary(BaseModel):
+    stats: HistoryStats
+    timeline_data: List[TimelinePoint]
+    subject_chart_data: List[SubjectDistribution]
+    difficulty_chart_data: List[DifficultyDistribution]
+    recent_sessions: List[StudySession] # Re-use the existing StudySession schema

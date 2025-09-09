@@ -23,11 +23,6 @@ export interface Task {
   predicted_time?: number;
   subject: Subject;
 }
-
-interface Subject {
-  id: number;
-  name: string;
-}
 export default function SubjectDetailPage() {
   const { subjectId } = useParams<{ subjectId: string }>();
   const [subject, setSubject] = useState<Subject | null>(null);

@@ -11,7 +11,7 @@ import models
 from database import engine
 
 # Import all routers from the 'routers' directory
-from routes import subjects, tasks, sessions, auth,analytics, pomodoro
+from routes import subjects, tasks, sessions, auth,analytics, pomodoro, history
 import routes.ml_endpoint as ml_endpoints
 
 # This line ensures all database tables are created based on your models
@@ -49,6 +49,7 @@ app.include_router(sessions.router)
 app.include_router(ml_endpoints.router)
 app.include_router(analytics.router) # <-- ADD THIS LINE
 app.include_router(pomodoro.router) # <-- ADD THIS LINE
+app.include_router(history.router) # <-- ADD THIS LINE
 
 @app.get("/", tags=["Root"])
 async def read_root():
