@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import ProtectedRoute from "../../../components/ProtectedRoute"
+import CompletionModal from '../../../components/CompletionModel';
 import apiClient from "../../../api/axios"
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { ArrowLeft, Clock, GripVertical, Plus } from "lucide-react"
@@ -58,6 +59,7 @@ const initialColumns: Columns = {
 
 export default function KanbanBoardPage() {
   const [columns, setColumns] = useState<Columns>(initialColumns)
+  const [taskToComplete, setTaskToComplete] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -112,15 +114,43 @@ export default function KanbanBoardPage() {
     })
 
     // API Call: Update the task status on the backend
-    try {
-      const newStatus = destination.droppableId
-      await apiClient.patch(`/tasks/${draggableId}/status`, { status: newStatus })
-    } catch (error) {
-      console.error("Failed to update task status:", error)
-      // If the API call fails, revert the UI change to maintain consistency
-      setColumns(columns)
+    const newStatus = destination.droppableId as "pending" | "in_progress" | "complete";
+
+    // Yadi task "Done" column mein drop hua hai, toh modal dikhayein
+    if (newStatus === 'complete') {
+      // Optimistic UI update ko REVERT karein, kyunki modal confirm karega
+      setColumns(columns); // Wapas purane state par le aayein
+      setTaskToComplete(movedTask); // Modal kholne ke liye task set karein
+    } else {
+      // Agar "To Do" ya "In Progress" mein drop hua hai, toh purana API call karein
+      try {
+        await apiClient.patch(`/tasks/${draggableId}/status`, { status: newStatus });
+      } catch (error) {
+        console.error("Failed to update task status:", error);
+        // Agar API fail ho, toh UI ko revert karein
+        setColumns(columns);
+      }
     }
+    // --- YAHAN TAK PASTE KAREIN ---
   }
+
+  // --- YEH NAYA FUNCTION ADD KAREIN ---
+  const handleSessionSaved = (completedTask: Task) => {
+    // UI ko update karein: task ko "Done" column mein move karein
+    setColumns(prevColumns => {
+      const newColumns = { ...prevColumns };
+      // Task ko purane column se hatayein
+      for (const key in newColumns) {
+        newColumns[key].tasks = newColumns[key].tasks.filter(t => t.id !== completedTask.id);
+      }
+      // Task ko "complete" column mein daalein
+      newColumns.complete.tasks.push({ ...completedTask, status: 'complete' });
+      return newColumns;
+    });
+    // Modal ko band karein
+    setTaskToComplete(null);
+  };
+  // --- END FUNCTION ---
 
   if (isLoading) {
     return (
@@ -135,6 +165,13 @@ export default function KanbanBoardPage() {
 
   return (
     <ProtectedRoute>
+      {taskToComplete && (
+        <CompletionModal
+          task={taskToComplete}
+          onClose={() => setTaskToComplete(null)}
+          onSessionSaved={handleSessionSaved}
+        />
+      )}
       <div className="min-h-screen bg-background">
         {/* Header Section */}
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -171,9 +208,8 @@ export default function KanbanBoardPage() {
                     <Card
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`${column.color} transition-all duration-200 ${
-                        snapshot.isDraggingOver ? "ring-2 ring-primary/20 shadow-lg" : "shadow-sm"
-                      }`}
+                      className={`${column.color} transition-all duration-200 ${snapshot.isDraggingOver ? "ring-2 ring-primary/20 shadow-lg" : "shadow-sm"
+                        }`}
                     >
                       <CardHeader className="pb-3">
                         <CardTitle className="flex items-center justify-between text-lg font-serif">
@@ -193,11 +229,10 @@ export default function KanbanBoardPage() {
                               <Card
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className={`group cursor-grab active:cursor-grabbing transition-all duration-200 ${
-                                  snapshot.isDragging
-                                    ? "shadow-xl ring-2 ring-primary/30 rotate-2"
-                                    : "hover:shadow-md hover:-translate-y-1"
-                                }`}
+                                className={`group cursor-grab active:cursor-grabbing transition-all duration-200 ${snapshot.isDragging
+                                  ? "shadow-xl ring-2 ring-primary/30 rotate-2"
+                                  : "hover:shadow-md hover:-translate-y-1"
+                                  }`}
                               >
                                 <CardContent className="p-4">
                                   <div className="flex items-start justify-between">

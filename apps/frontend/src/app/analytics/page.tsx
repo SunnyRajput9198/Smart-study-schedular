@@ -69,26 +69,26 @@ export default function AnalyticsPage() {
   const [summaryData, setSummaryData] = useState<AnalyticsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true)
 
-// --- PURAANA useEffect ISSE REPLACE KAREIN ---
-useEffect(() => {
-  const fetchAnalyticsSummary = async () => {
-    setIsLoading(true);
-    try {
-      const response = await apiClient.get("/analytics/summary");
-      setSummaryData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch analytics summary:", error);
-      // Agar error aaye to mock data use karein
-      setSummaryData(null
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // --- PURAANA useEffect ISSE REPLACE KAREIN ---
+  useEffect(() => {
+    const fetchAnalyticsSummary = async () => {
+      setIsLoading(true);
+      try {
+        const response = await apiClient.get("/analytics/summary");
+        setSummaryData(response.data);
+      } catch (error) {
+        console.error("Failed to fetch analytics summary:", error);
+        // Agar error aaye to mock data use karein
+        setSummaryData(null
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  fetchAnalyticsSummary();
-}, []);
-// --- END REPLACEMENT ---
+    fetchAnalyticsSummary();
+  }, []);
+  // --- END REPLACEMENT ---
 
   if (isLoading) {
     return (
@@ -101,34 +101,38 @@ useEffect(() => {
     )
   }
   // Yeh check karega ki data hai ya nahi
-if (!summaryData) {
+  if (!summaryData) {
     return (
-         <div className="flex items-center justify-center min-h-screen">
-            <p>No analytics data found yet. Complete some tasks!</p>
-         </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <p>No analytics data found yet. Complete some tasks!</p>
+      </div>
     )
-}
-const { subjects, daily, weekly, performance } = summaryData; // <-- YEH LINE ADD KAREIN
-// Chart ke liye data taiyaar karein
-const weeklyChartData = Object.entries(weekly.daily_summary)
-  .map(([day, minutes]) => ({
-    day: new Date(day).toLocaleDateString("en-US", { weekday: "short" }),
-    minutes: minutes,
-  }))
-  .reverse();
+  }
+  const { subjects, daily, weekly, performance } = summaryData; // <-- YEH LINE ADD KAREIN
+  // --- YEH PURA BLOCK PASTE KAREIN ---
 
-const subjectPieData = subjects.map((subject, index) => ({
-  name: subject.subject_name,
-  value: subject.total_minutes_studied,
-  color: `hsl(var(--chart-${(index % 5) + 1}))`,
-}));
+  // Chart ke liye data taiyaar karein
+  const weeklyChartData = Object.entries(weekly.daily_summary)
+    .map(([day, minutes]) => ({
+      day: new Date(day).toLocaleDateString("en-US", { weekday: "short" }),
+      minutes: minutes,
+    }))
+    .reverse();
 
-const performanceChartData = [
-  { metric: "Productivity", score: performance.productivity_score, target: 90 },
-  { metric: "Focus Quality", score: performance.average_session_quality * 20, target: 85 },
-  { metric: "Consistency", score: (weekly.streak_days / 7) * 100, target: 80 },
-  { metric: "Goal Achievement", score: daily.completion_rate, target: 85 },
-];
+  const subjectPieData = subjects.map((subject, index) => ({
+    name: subject.subject_name,
+    value: subject.total_minutes_studied,
+    // Pie chart ke liye alag-alag colors banaye
+    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
+  }));
+
+  const performanceChartData = [
+    { metric: "Productivity", score: performance.productivity_score, target: 90 },
+    { metric: "Focus Quality", score: performance.average_session_quality * 20, target: 85 },
+    { metric: "Consistency", score: (weekly.streak_days / 7) * 100, target: 80 },
+    { metric: "Goal Achievement", score: daily.completion_rate, target: 85 },
+  ];
+  // --- YAHAN TAK PASTE KAREIN --
 
   return (
     <ProtectedRoute>
@@ -278,7 +282,7 @@ const performanceChartData = [
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={subjects}
+                      data={subjectPieData}
                       cx="50%"
                       cy="50%"
                       outerRadius={100}
@@ -286,8 +290,8 @@ const performanceChartData = [
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {subjects.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.subject_name} />
+                      {subjectPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
                     <Tooltip
@@ -358,9 +362,9 @@ const performanceChartData = [
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={performanceChartData} layout="horizontal">
-                    <XAxis type="number" domain={[0, 100]} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis type="category" dataKey="metric" stroke="hsl(var(--muted-foreground))" width={80} />
+                  <ComposedChart data={performanceChartData} layout="vertical">
+                    <XAxis type="category" dataKey="metric" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis type="number" domain={[0, 100]} stroke="hsl(var(--muted-foreground))" width={80} />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
