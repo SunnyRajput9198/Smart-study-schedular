@@ -266,3 +266,20 @@ class SubjectSummary(BaseModel):
     avg_predicted_time: int
     total_tasks: int  # Total tasks field added
 # --- YAHAN TAK PASTE KAREIN ---
+
+# --- YEH NAYA BLOCK PASTE KAREIN ---
+# ==============================================================================
+# 8. Notification Schemas
+# ==============================================================================
+
+class Notification(BaseModel):
+    task_id: int
+    task_title: str
+    subject_name: str
+    due_date: datetime
+    subject_id: int  # Added subject_id field for linking
+# --- YAHAN TAK PASTE KAREIN ---
+
+# In the Task Schemas section
+class RescheduleRequest(BaseModel):
+    delay_days: int = Field(gt=0, description="Number of days after which to revise the task")

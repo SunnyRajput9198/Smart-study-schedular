@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState ,useCallback} from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import ProtectedRoute from "../../../components/ProtectedRoute"
@@ -107,26 +107,65 @@ export default function SubjectDetailPage() {
     fetchSubjectDetails()
   }, [subjectId])
 
-  const handleTaskAdded = (newTask: Task) => {
-    setTasks((prevTasks) => [...prevTasks, newTask])
-      const fetchSummary = async () => {
-        const summaryRes = await apiClient.get(`/subjects/${subjectId}/summary`);
-        setSummary(summaryRes.data);
-    }
-    fetchSummary();
-  }
+  // --- YEH NAYA FUNCTION useEffect SE PEHLE PASTE KAREIN ---
+const fetchAllData = useCallback(async () => {
+    if (!subjectId) return;
 
-  const handleSessionSaved = (completedTask: Task) => {
-    setTasks((currentTasks) =>
-      currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "complete" } : task)),
-    )
-    setSelectedTask(null)
-    const fetchSummary = async () => {
-        const summaryRes = await apiClient.get(`/subjects/${subjectId}/summary`);
+    // Sirf pehli baar page-level loading dikhayein
+    if (!subject) setIsLoading(true);
+
+    setError(null);
+    try {
+        const subjectIdNum = Number.parseInt(subjectId, 10);
+        if (isNaN(subjectIdNum)) throw new Error("Invalid subject ID");
+
+        // Saara data ek saath parallel mein fetch karein
+        const [subjectRes, tasksRes, summaryRes] = await Promise.all([
+            apiClient.get(`/subjects/${subjectIdNum}`),
+            apiClient.get(`/tasks/${subjectIdNum}`),
+            apiClient.get(`/subjects/${subjectIdNum}/summary`)
+        ]);
+
+        setSubject(subjectRes.data);
+        setTasks(tasksRes.data);
         setSummary(summaryRes.data);
+
+        const pendingTasks = (tasksRes.data as Task[]).filter(task => task.status === 'pending');
+        if (pendingTasks.length > 0) {
+            setIsPredicting(true);
+            const taskIds = pendingTasks.map((task) => task.id);
+            const predictionRes = await apiClient.post("/ml/predict-time", { task_ids: taskIds });
+
+            const predictions = predictionRes.data.predictions;
+            setTasks((currentTasks) =>
+                currentTasks.map((task) => {
+                    const prediction = predictions.find((p: any) => p.task_id === task.id);
+                    return prediction ? { ...task, predicted_time: Math.round(prediction.predicted_time_minutes) } : task;
+                })
+            );
+            setIsPredicting(false);
+        }
+    } catch (err: any) {
+        console.error("Failed to fetch data:", err);
+        setError("Failed to load subject details. Please try again.");
+    } finally {
+        setIsLoading(false);
     }
-    fetchSummary();
-  }
+}, [subjectId, subject]); // Dependency array
+// --- YAHAN TAK PASTE KAREIN ---
+ const handleTaskAdded = (newTask: Task) => {
+    // UI ko turant update karein, phir backend se fresh data lein
+    setTasks((prevTasks) => [...prevTasks, newTask]);
+    fetchAllData(); // Refresh all data
+};
+
+const handleSessionSaved = (completedTask: Task) => {
+    setTasks((currentTasks) =>
+        currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "completed" } : task)),
+    );
+    setSelectedTask(null);
+    fetchAllData(); // Refresh all data
+};
     const filteredTasks = showCompleted
     ? tasks
     : tasks.filter((task) => task.status !== "complete");

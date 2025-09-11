@@ -10,11 +10,18 @@ import SmartSchedule from "../components/SmartSchedulat"
 import Link from "next/link"
 import PomodoroTimer from "../components/PomodoroTimer"
 import AIInsights from "../components/AIInsight"
+import NotificationBell from '../components/Notificationcall';
 
 interface Subject {
   id: number
   name: string
   color_tag: string | null
+}
+interface Task {
+  id: number;
+  title: string;
+  deadline: string | null;
+  subject_id: number; // Humein link banane ke liye iski zaroorat hai
 }
 
 export default function DashboardPage() {
@@ -23,35 +30,36 @@ export default function DashboardPage() {
   const [summaryData, setSummaryData] = useState<any | null>(null); // <-- YEH LINE ADD KAREIN
 
   const { logout, activesessions, setactivesessions } = useAuthStore();
-  
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn)
 
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn)
+  const [rescheduledTasks, setRescheduledTasks] = useState<Task[]>([]); // Hum Subject type reuse kar sakte hain
+  const [showRescheduled, setShowRescheduled] = useState(false);
   const router = useRouter()
-// --- PURAANA useEffect ISSE REPLACE KAREIN ---
-useEffect(() => {
+  // --- PURAANA useEffect ISSE REPLACE KAREIN ---
+  useEffect(() => {
     const fetchDashboardData = async () => {
-        if (!isLoggedIn) {
-            setIsLoading(false);
-            return;
-        }
-        setIsLoading(true);
-        try {
-            // Hum subjects aur summary data ek saath fetch karenge
-            const [subjectsRes, summaryRes] = await Promise.all([
-                apiClient.get("/subjects/"),
-                apiClient.get("/analytics/summary")
-            ]);
-            setSubjects(subjectsRes.data);
-            setSummaryData(summaryRes.data); // Naya data save karein
-        } catch (error) {
-            console.error("Failed to fetch dashboard data:", error);
-        } finally {
-            setIsLoading(false);
-        }
+      if (!isLoggedIn) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        // Hum subjects aur summary data ek saath fetch karenge
+        const [subjectsRes, summaryRes] = await Promise.all([
+          apiClient.get("/subjects/"),
+          apiClient.get("/analytics/summary")
+        ]);
+        setSubjects(subjectsRes.data);
+        setSummaryData(summaryRes.data); // Naya data save karein
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchDashboardData();
-}, [isLoggedIn]);
-// --- END REPLACEMENT ---
+  }, [isLoggedIn]);
+  // --- END REPLACEMENT ---
   const handleSubjectAdded = (newSubject: Subject) => {
     setSubjects((prevSubjects) => [...prevSubjects, newSubject])
   }
@@ -60,7 +68,29 @@ useEffect(() => {
     logout()
     router.push("/login")
   }
+  // --- YEH NAYA FUNCTION PASTE KAREIN ---
+  const fetchRescheduledTasks = async () => {
+    if (showRescheduled) {
+      setShowRescheduled(false);
+      return;
+    }
 
+    setShowRescheduled(true);
+    try {
+      const response = await apiClient.get("/tasks/rescheduled");
+      console.log("Rescheduled tasks response:", response.data); // Debug log
+      setRescheduledTasks(response.data);
+    } catch (error) {
+      console.error("Failed to fetch rescheduled tasks:", error);
+      // Show the actual error details
+      if (error.response) {
+        console.error("Error status:", error.response.status);
+        console.error("Error data:", error.response.data);
+      }
+      setShowRescheduled(false); // Close the panel if there's an error
+    }
+  };
+  // --- YAHAN TAK PASTE KAREIN ---
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-background via-muted to-card">
@@ -77,6 +107,7 @@ useEffect(() => {
               </div>
 
               <nav className="flex items-center space-x-2">
+                <NotificationBell /> {/* <-- ADD THIS LINE */}
                 <Link
                   href="/tasks/board"
                   className="px-4 py-2 text-sm font-medium text-foreground hover:text-primary transition-colors duration-200 rounded-lg hover:bg-muted"
@@ -96,6 +127,12 @@ useEffect(() => {
                   History
                 </Link>
                 <button
+                  onClick={fetchRescheduledTasks}
+                  className="px-4 py-2 text-sm font-medium text-foreground hover:text-primary transition-colors duration-200 rounded-lg hover:bg-muted"
+                >
+                  Revisions
+                </button>
+                <button
                   onClick={handleLogout}
                   className="px-4 py-2 text-sm font-medium bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors duration-200"
                 >
@@ -105,6 +142,43 @@ useEffect(() => {
             </div>
           </div>
         </header>
+        {showRescheduled && (
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-white">Scheduled Revisions</h3>
+                <button
+                  onClick={() => setShowRescheduled(false)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {rescheduledTasks.length > 0 ? (
+                <div className="space-y-3">
+                  {rescheduledTasks.map((task) => (
+                    <Link href={`/subjects/${task.subject_id}`} key={task.id}>
+                      <div className="p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors cursor-pointer flex justify-between items-center">
+                        <div>
+                          <p className="font-semibold text-white">{task.title}</p>
+                          <p className="text-sm text-gray-400">
+                            Due on: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                        <span className="text-xs font-medium bg-purple-600 text-white px-2 py-1 rounded-full">Review</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No revision tasks scheduled</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-12">
@@ -158,7 +232,6 @@ useEffect(() => {
             </div>
           </div>
         </section>
-
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
             <div className="space-y-8">
@@ -205,7 +278,7 @@ useEffect(() => {
                             </span>
                           </div>
                           <div>
-                            <h3 className="font-semibold text-whoite group-hover:text-primary transition-colors duration-200">
+                            <h3 className="font-semibold text-black group-hover:text-primary transition-colors duration-200">
                               {subject.name}
                             </h3>
                             <p className="text-sm text-muted-foreground">Click to view tasks</p>

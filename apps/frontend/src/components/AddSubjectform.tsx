@@ -46,7 +46,7 @@ export default function AddSubjectForm({ onSubjectAdded }: AddSubjectFormProps) 
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., Quantum Physics"
-          className="flex-grow px-3 py-2 text-white bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-grow px-3 py-2 text-white bg-black rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button type="submit" className="px-6 py-2 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">
           Add Subject

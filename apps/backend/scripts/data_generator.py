@@ -25,13 +25,17 @@ class SyntheticDataGenerator:
     async def get_password_hash(self, password):
         return pwd_context.hash(password)
 
+    # --- PURAANA clear_existing_data ISSE REPLACE KAREIN ---
     async def clear_existing_data(self, conn):
         print("Clearing existing synthetic data...")
+    #   THE FIX: Delete in the correct order, starting with the "children"
+        await conn.execute("DELETE FROM pomodoro_sessions;")
         await conn.execute("DELETE FROM study_sessions;")
         await conn.execute("DELETE FROM tasks;")
         await conn.execute("DELETE FROM subjects;")
         await conn.execute("DELETE FROM users;")
         print("Data cleared.")
+# --- YAHAN TAK REPLACE KAREIN ---
 
     async def generate_users(self, conn, num_users=5):
         print(f"Generating {num_users} users...")

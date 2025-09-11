@@ -245,9 +245,7 @@ export default function AnalyticsPage() {
                       endAngle={-270}
                     >
                       <RadialBar
-                        minAngle={15}
-                        background={{ fill: "hsl(var(--muted))" }}
-                        clockWise={true}
+                        background={{ fill: "hsl(var(--muted))" }}  
                         dataKey="value"
                         cornerRadius={10}
                       />
