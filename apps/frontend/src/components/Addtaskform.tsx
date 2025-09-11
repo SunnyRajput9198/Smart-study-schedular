@@ -49,7 +49,7 @@ export default function AddTaskForm({ subjectId, onTaskAdded }: Props) {
   };
 
   return (
-    <div className="p-6 mb-8 bg-gray-800 rounded-lg shadow-md">
+    <div className="p-6 mb-8 bg-gray-200 rounded-lg shadow-md">
       <h3 className="text-xl font-semibold mb-4">Add a New Task</h3>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

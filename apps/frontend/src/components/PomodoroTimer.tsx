@@ -3,20 +3,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import apiClient from '../api/axios';
+import useAuthStore from '../stores/authStore';
 
-const WORK_DURATION = 25 * 60; // 25 minutes in seconds
-const BREAK_DURATION = 5 * 60; // 5 minutes in seconds
+const WORK_DURATION = 5; // 25 minutes in seconds
+const BREAK_DURATION = 5; // 5 minutes in seconds
 
 export default function PomodoroTimer() {
   const [timeRemaining, setTimeRemaining] = useState(WORK_DURATION);
   const [isActive, setIsActive] = useState(false);
   const [isBreak, setIsBreak] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const setActiveSessions = useAuthStore((state) => state.setactivesessions);
+  // const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  useEffect(() => {
-    // Preload the audio
-    audioRef.current = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
-  }, []);
+  // useEffect(() => {
+  //   // Preload the audio
+  //   audioRef.current = new Audio('https://www.soundjay.com/buttons/sounds/button-16.mp3');
+  // }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -27,7 +29,7 @@ export default function PomodoroTimer() {
       }, 1000);
     } else if (isActive && timeRemaining === 0) {
       // Timer finished
-      audioRef.current?.play();
+      // audioRef.current?.play();
       logSession();
       setIsActive(false);
       setIsBreak((prevBreak) => !prevBreak);
@@ -45,9 +47,10 @@ export default function PomodoroTimer() {
       await apiClient.post('/pomodoro/log', {
         start_time: new Date(Date.now() - WORK_DURATION * 1000).toISOString(),
         end_time: new Date().toISOString(),
-        duration: WORK_DURATION / 60,
+        duration: Math.ceil(WORK_DURATION / 60),
       });
       console.log("Pomodoro session logged successfully.");
+      useAuthStore.setState(state => ({ activesessions: state.activesessions + 1 }));
     } catch (error) {
       console.error("Failed to log Pomodoro session:", error);
     }
@@ -69,7 +72,7 @@ export default function PomodoroTimer() {
   const progress = ((isBreak ? BREAK_DURATION : WORK_DURATION) - timeRemaining) / (isBreak ? BREAK_DURATION : WORK_DURATION);
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+    <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
       <h3 className="text-sm font-semibold mb-4 text-center">{isBreak ? 'Break Time!' : 'Focus Session'}</h3>
       <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
         <svg className="w-full h-full" viewBox="0 0 100 100">

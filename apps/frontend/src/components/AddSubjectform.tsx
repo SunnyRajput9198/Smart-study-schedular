@@ -37,7 +37,7 @@ export default function AddSubjectForm({ onSubjectAdded }: AddSubjectFormProps) 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 mb-8 bg-gray-800 rounded-lg shadow-md">
+    <form onSubmit={handleSubmit} className="p-6 mb-8 text-shadow-amber-200 rounded-lg shadow-md bg-gray-200">
       <h3 className="text-xl font-semibold mb-4">Add a New Subject</h3>
       {error && <p className="mb-4 text-red-500">{error}</p>}
       <div className="flex gap-4">

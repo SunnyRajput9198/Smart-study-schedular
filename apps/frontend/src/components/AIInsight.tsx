@@ -28,13 +28,13 @@ export default function AIInsights() {
   }, []);
 
   return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+    <div className="bg-gray-100 p-6 rounded-lg shadow-md mb-8">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">💡 AI Insights</h3>
         <button
           onClick={fetchInsights}
           disabled={isLoading}
-          className="text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
+          className="text-black hover:text-indigo-300 disabled:opacity-50"
           title="Get a new insight"
         >
           Refresh
@@ -43,11 +43,11 @@ export default function AIInsights() {
       
       <div className="min-h-[60px] flex items-center">
         {isLoading ? (
-          <p className="text-gray-400 animate-pulse">Generating personalized advice...</p>
+          <p className="text-black animate-pulse">Generating personalized advice...</p>
         ) : error ? (
           <p className="text-red-400">{error}</p>
         ) : (
-          <p className="text-gray-300 italic">
+          <p className="text-black italic">
             "{recommendations[0]}"
           </p>
         )}

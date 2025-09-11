@@ -31,7 +31,7 @@ export default function SmartSchedule() {
   };
 
   return (
-    <div className="p-6 mb-8 bg-gray-800 rounded-lg shadow-md">
+    <div className="p-6 mb-8 bg-gray-100 rounded-lg shadow-md">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
         <h3 className="text-xl font-semibold text-center sm:text-left">Your AI-Powered Daily Focus</h3>
         <button
@@ -48,17 +48,17 @@ export default function SmartSchedule() {
       <div className="space-y-3 mt-4">
         {schedule.length > 0 ? (
           schedule.map((task, index) => (
-            <div key={task.task_id} className="p-4 bg-gray-700 rounded-lg border-l-4 border-indigo-500 animate-fade-in">
+            <div key={task.task_id} className="p-4 bg-gray-200 rounded-lg border-l-4 border-indigo-500 animate-fade-in">
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-lg font-bold text-indigo-300">#{index + 1} {task.task_name}</span>
-                  <p className="text-sm text-gray-400">Subject: {task.subject_name}</p>
+                  <p className="text-sm text-black">Subject: {task.subject_name}</p>
                 </div>
-                <span className="px-3 py-1 text-sm font-medium rounded-full bg-indigo-500 text-white">
+                <span className="px-3 py-1 text-sm font-medium rounded-full bg-indigo-500 text-black">
                   Priority: {task.priority_score.toFixed(2)}
                 </span>
               </div>
-              <p className="mt-2 text-sm text-gray-300 italic">
+              <p className="mt-2 text-sm text-black italic">
                 <strong>Reason:</strong> {task.recommendation_reason}
               </p>
             </div>

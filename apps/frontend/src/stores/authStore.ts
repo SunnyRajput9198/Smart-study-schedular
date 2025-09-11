@@ -21,8 +21,10 @@ interface AuthState {
   user: User | null;
   isLoggedIn: boolean;
   setToken: (token: string | null) => void;
+  activesessions: number; // Added this line
   logout: () => void;
   clearToken: () => void; // Added this method
+  setactivesessions: (count: number) => void; // Added this line
 }
 
 const useAuthStore = create<AuthState>()(
@@ -31,6 +33,8 @@ const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       isLoggedIn: false,
+      activesessions: 0, // Added this line
+      setactivesessions: (count: number) => set({ activesessions: count }), // Added this line  
       setToken: (token) => {
         if (token) {
           try {
