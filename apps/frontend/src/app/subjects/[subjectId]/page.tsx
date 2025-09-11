@@ -29,6 +29,15 @@ export interface Task {
   subject: Subject
 }
 
+interface SubjectSummary {
+    completed_tasks: number;
+    pending_tasks: number;
+    completion_rate: number;
+    avg_estimated_time: number;
+    avg_predicted_time: number;
+    total_tasks: number;
+}
+
 export default function SubjectDetailPage() {
   const { subjectId } = useParams<{ subjectId: string }>()
   const [subject, setSubject] = useState<Subject | null>(null)
@@ -37,24 +46,9 @@ export default function SubjectDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isPredicting, setIsPredicting] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [showCompleted, setShowCompleted] = useState(false); // <-- YEH LINE ADD KAREIN
+  const [summary, setSummary] = useState<SubjectSummary | null>(null); // <-- YEH LINE ADD KAREIN
 
-  const completedTasks = tasks.filter((task) => task.status === "completed").length
-  const totalTasks = tasks.length
-  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
-  const pendingTasks = tasks.filter((task) => task.status === "pending")
-  const avgEstimatedTime =
-    pendingTasks.length > 0
-      ? Math.round(pendingTasks.reduce((sum, task) => sum + task.estimated_time, 0) / pendingTasks.length)
-      : 0
-  const avgPredictedTime =
-    pendingTasks.filter((task) => task.predicted_time).length > 0
-      ? Math.round(
-          pendingTasks
-            .filter((task) => task.predicted_time)
-            .reduce((sum, task) => sum + (task.predicted_time || 0), 0) /
-            pendingTasks.filter((task) => task.predicted_time).length,
-        )
-      : 0
 
   useEffect(() => {
     if (!subjectId) return
@@ -72,7 +66,9 @@ export default function SubjectDetailPage() {
         setSubject(subjectRes.data)
 
         const tasksRes = await apiClient.get(`/tasks/${subjectIdNum}`)
+        const summaryRes = await apiClient.get(`/subjects/${subjectIdNum}/summary`)
         setTasks(tasksRes.data)
+        setSummary(summaryRes.data);
 
         const initialTasks: Task[] = tasksRes.data
 
@@ -86,6 +82,7 @@ export default function SubjectDetailPage() {
 
           const predictions = predictionRes.data.predictions
           setTasks((currentTasks) =>
+            
             currentTasks.map((task) => {
               const prediction = predictions.find((p: any) => p.task_id === task.id)
               return prediction ? { ...task, predicted_time: Math.round(prediction.predicted_time_minutes) } : task
@@ -112,14 +109,27 @@ export default function SubjectDetailPage() {
 
   const handleTaskAdded = (newTask: Task) => {
     setTasks((prevTasks) => [...prevTasks, newTask])
+      const fetchSummary = async () => {
+        const summaryRes = await apiClient.get(`/subjects/${subjectId}/summary`);
+        setSummary(summaryRes.data);
+    }
+    fetchSummary();
   }
 
   const handleSessionSaved = (completedTask: Task) => {
     setTasks((currentTasks) =>
-      currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "completed" } : task)),
+      currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "complete" } : task)),
     )
     setSelectedTask(null)
+    const fetchSummary = async () => {
+        const summaryRes = await apiClient.get(`/subjects/${subjectId}/summary`);
+        setSummary(summaryRes.data);
+    }
+    fetchSummary();
   }
+    const filteredTasks = showCompleted
+    ? tasks
+    : tasks.filter((task) => task.status !== "complete");
 
   if (isLoading) {
     return (
@@ -201,7 +211,7 @@ export default function SubjectDetailPage() {
                 <Target className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-4xl font-bold text-foreground text-balance">{subject.name}</h1>
+                <h1 className="text-4xl font-bold text-black text-balance">{subject.name}</h1>
                 <p className="text-muted-foreground mt-1">Manage your tasks and track progress</p>
               </div>
             </div>
@@ -214,7 +224,7 @@ export default function SubjectDetailPage() {
                       <CheckCircle2 className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-foreground">{completedTasks}</p>
+                      <p className="text-2xl font-bold text-black">{summary?.completed_tasks || 0}</p>
                       <p className="text-sm text-muted-foreground">Completed</p>
                     </div>
                   </div>
@@ -225,10 +235,10 @@ export default function SubjectDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                      <Circle className="h-5 w-5 text-accent" />
+                      <Circle className="h-5 w-5 text-black" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-foreground">{pendingTasks.length}</p>
+                      <p className="text-2xl font-bold text-black">{summary?.pending_tasks || 0}</p>
                       <p className="text-sm text-muted-foreground">Pending</p>
                     </div>
                   </div>
@@ -239,10 +249,10 @@ export default function SubjectDetailPage() {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                      <TrendingUp className="h-5 w-5 text-secondary" />
+                      <TrendingUp className="h-5 w-5 text-black" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-foreground">{Math.round(completionRate)}%</p>
+                      <p className="text-2xl font-bold text-foreground">{Math.round(summary?.completion_rate || 0)}%</p>
                       <p className="text-sm text-muted-foreground">Progress</p>
                     </div>
                   </div>
@@ -256,7 +266,7 @@ export default function SubjectDetailPage() {
                       <Brain className="h-5 w-5 text-chart-4" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-foreground">{avgPredictedTime || avgEstimatedTime}</p>
+                      <p className="text-2xl font-bold text-foreground">{summary?.avg_predicted_time || summary?.avg_predicted_time}</p>
                       <p className="text-sm text-muted-foreground">Avg. Time (min)</p>
                     </div>
                   </div>
@@ -295,44 +305,59 @@ export default function SubjectDetailPage() {
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-foreground">Your Tasks</h2>
-              {totalTasks > 0 && (
+              {/* // --- PURAANI h2 LINE ISSE REPLACE KAREIN --- */}
+              <div className="flex items-center justify-between gap-4">
+                <h2 className=" text-2xl font-bold text-gray-900">Your Tasks</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCompleted(!showCompleted)}
+                >
+                  {showCompleted ? 'Hide Completed' : 'Show Completed'}
+                </Button>
+              </div>
+              {/* // --- YAHAN TAK REPLACE KAREIN --- */}
+              {summary?.total_tasks! > 0 && (
                 <div className="flex items-center gap-4">
                   <div className="text-sm text-muted-foreground">
-                    Progress: {completedTasks}/{totalTasks}
+                    Progress: {summary?.completed_tasks}/{summary?.total_tasks}
                   </div>
-                  <Progress value={completionRate} className="w-24" />
+                  <Progress value={summary?.completion_rate || 0} className="w-24" />
                 </div>
               )}
             </div>
 
-            {tasks.length > 0 ? (
+            {filteredTasks.length > 0 ? (
               <div className="grid gap-4">
-                {tasks.map((task) => (
+                {filteredTasks.map((task) => (
                   <Card
                     key={task.id}
-                    className={`transition-all duration-200 hover:shadow-md ${
-                      task.status === "completed" ? "bg-primary/5 border-primary/20" : "hover:border-primary/30"
-                    }`}
+                    className={`transition-all duration-200 hover:shadow-md ${task.status === "complete" ? "bg-primary/5 border-primary/20" : "hover:border-primary/30"
+                      }`}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            {task.status === "completed" ? (
+                            {task.status === "complete" ? (
                               <CheckCircle2 className="h-5 w-5 text-primary" />
                             ) : (
-                              <Circle className="h-5 w-5 text-muted-foreground" />
+                              // THE CHANGE: The Circle is now a button
+                              <button
+                                onClick={() => setSelectedTask(task)}
+                                className="group"
+                                aria-label={`Complete task: ${task.title}`}
+                              >
+                                <Circle className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors duration-200" />
+                              </button>
                             )}
                             <h3
-                              className={`text-lg font-semibold ${
-                                task.status === "completed" ? "text-primary line-through" : "text-foreground"
-                              }`}
+                              className={`text-lg font-semibold ${task.status === "complete" ? "text-primary line-through" : "text-foreground"
+                                }`}
                             >
                               {task.title}
                             </h3>
                           </div>
-
                           <div className="flex items-center gap-6 text-sm">
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Clock className="h-4 w-4" />
@@ -351,22 +376,20 @@ export default function SubjectDetailPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                          <Badge
-                            variant={task.status === "completed" ? "default" : "secondary"}
-                            className={task.status === "completed" ? "bg-primary text-primary-foreground" : ""}
-                          >
+
+                        <div className="flex items-center gap-4">
+                          <span className={`px-3 py-1 text-sm rounded-full text-white ${task.status === 'pending' ? 'bg-yellow-500' : 'bg-green-500'}`}>
                             {task.status}
-                          </Badge>
-                          {task.status === "pending" && (
-                            <Button
+                          </span>
+
+                          {/* THE FIX: Yeh button ab sirf 'pending' tasks ke liye dikhega */}
+                          {task.status === 'pending' && (
+                            <button
                               onClick={() => setSelectedTask(task)}
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                              size="sm"
+                              className="px-3 py-1 font-semibold text-white bg-green-600 rounded-md hover:bg-green-700"
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Complete
-                            </Button>
+                              ✓ Complete
+                            </button>
                           )}
                         </div>
                       </div>
@@ -383,6 +406,9 @@ export default function SubjectDetailPage() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-foreground mb-2">No tasks yet</h3>
+                       {!showCompleted && tasks.length > 0 && (
+                    <p className="text-muted-foreground">You might have completed tasks. Click "Show Completed" to view them.</p>
+                  )}
                       <p className="text-muted-foreground">
                         Add your first task above to get started on your learning journey!
                       </p>

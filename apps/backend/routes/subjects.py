@@ -90,3 +90,60 @@ def get_single_subject(
             )
 
     return subject
+
+# --- YEH NAYA FUNCTION PASTE KAREIN ---
+@router.get("/{subject_id}/summary", response_model=schema.SubjectSummary)
+def get_subject_summary(
+    subject_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """
+    Calculates and returns a summary of statistics for a specific subject.
+    """
+    # Security check: Make sure the subject belongs to the current user
+    subject = db.query(models.Subject).filter(
+        models.Subject.id == subject_id,
+        models.Subject.user_id == current_user.id
+    ).first()
+
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    # Calculate completed tasks
+    completed_tasks = db.query(models.Task).filter(
+        models.Task.subject_id == subject_id,
+        models.Task.status == 'complete'
+    ).count()
+
+    # Calculate pending tasks
+    pending_tasks_query = db.query(models.Task).filter(
+        models.Task.subject_id == subject_id,
+        models.Task.status == 'pending'
+    )
+
+    pending_tasks_list = pending_tasks_query.all()
+    pending_tasks_count = len(pending_tasks_list)
+
+    total_tasks = completed_tasks + pending_tasks_count
+    completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+    # Calculate average times for PENDING tasks only
+    avg_estimated_time = 0
+    if pending_tasks_count > 0:
+        total_est_time = sum(task.estimated_time for task in pending_tasks_list)
+        avg_estimated_time = round(total_est_time / pending_tasks_count)
+
+    # NOTE: Avg predicted time requires fetching predictions. For now, we'll simulate it.
+    # A full implementation would call the prediction model here.
+    avg_predicted_time = round(avg_estimated_time * 1.1) # Simulate AI predicting 10% more time
+
+    return schema.SubjectSummary(
+        completed_tasks=completed_tasks,
+        pending_tasks=pending_tasks_count,
+        completion_rate=completion_rate,
+        avg_estimated_time=avg_estimated_time,
+        avg_predicted_time=avg_predicted_time,
+        total_tasks=total_tasks
+    )
+# --- YAHAN TAK PASTE KAREIN ---

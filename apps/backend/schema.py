@@ -256,3 +256,13 @@ class HistorySummary(BaseModel):
     subject_chart_data: List[SubjectDistribution]
     difficulty_chart_data: List[DifficultyDistribution]
     recent_sessions: List[StudySession] # Re-use the existing StudySession schema
+    
+# --- YEH NAYA BLOCK PASTE KAREIN ---
+class SubjectSummary(BaseModel):
+    completed_tasks: int
+    pending_tasks: int
+    completion_rate: float
+    avg_estimated_time: int
+    avg_predicted_time: int
+    total_tasks: int  # Total tasks field added
+# --- YAHAN TAK PASTE KAREIN ---

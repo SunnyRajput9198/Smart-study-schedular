@@ -20,40 +20,38 @@ interface Subject {
 export default function DashboardPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [summaryData, setSummaryData] = useState<any | null>(null); // <-- YEH LINE ADD KAREIN
 
   const { logout, activesessions, setactivesessions } = useAuthStore();
+  
   const isLoggedIn = useAuthStore((state) => state.isLoggedIn)
 
   const router = useRouter()
-
-  useEffect(() => {
-    const fetchSubjects = async () => {
-      if (!isLoggedIn) {
-        setIsLoading(false)
-        return
-      }
-
-      setIsLoading(true)
-      try {
-        const [subjectRes, pomodoroRes] = await Promise.all([ // <-- Add pomodoroRes
-          apiClient.get("/subjects/"),
-          apiClient.get("/pomodoro/recent-count") // <-- ADD THIS LINE
-        ]);
-        setSubjects(subjectRes.data)
-        setactivesessions(pomodoroRes.data.active_sessions); // <-- UPDATE THIS LINE
-      } catch (error) {
-        console.error("Failed to fetch subjects:", error)
-        if ((error as any).response?.status === 401) {
-          handleLogout()
+// --- PURAANA useEffect ISSE REPLACE KAREIN ---
+useEffect(() => {
+    const fetchDashboardData = async () => {
+        if (!isLoggedIn) {
+            setIsLoading(false);
+            return;
         }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchSubjects()
-  }, [isLoggedIn])
-
+        setIsLoading(true);
+        try {
+            // Hum subjects aur summary data ek saath fetch karenge
+            const [subjectsRes, summaryRes] = await Promise.all([
+                apiClient.get("/subjects/"),
+                apiClient.get("/analytics/summary")
+            ]);
+            setSubjects(subjectsRes.data);
+            setSummaryData(summaryRes.data); // Naya data save karein
+        } catch (error) {
+            console.error("Failed to fetch dashboard data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    fetchDashboardData();
+}, [isLoggedIn]);
+// --- END REPLACEMENT ---
   const handleSubjectAdded = (newSubject: Subject) => {
     setSubjects((prevSubjects) => [...prevSubjects, newSubject])
   }
@@ -151,7 +149,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Productivity Score</p>
-                  <p className="text-3xl font-bold text-chart-1">85%</p>
+                  <p className="text-3xl font-bold text-chart-1">{summaryData?.performance?.productivity_score || 0}%</p>
                 </div>
                 <div className="w-12 h-12 bg-chart-1/10 rounded-lg flex items-center justify-center">
                   <span className="text-chart-1 text-xl">📈</span>
