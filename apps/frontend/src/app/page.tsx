@@ -83,8 +83,11 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Failed to fetch rescheduled tasks:", error);
       // Show the actual error details
+      // @ts-ignore
       if (error.response) {
+        // @ts-ignore
         console.error("Error status:", error.response.status);
+        // @ts-ignore
         console.error("Error data:", error.response.data);
       }
       setShowRescheduled(false); // Close the panel if there's an error
@@ -128,7 +131,7 @@ export default function DashboardPage() {
                 </Link>
                 <button
                   onClick={fetchRescheduledTasks}
-                  className="px-4 py-2 text-sm font-medium text-foreground hover:text-primary transition-colors duration-200 rounded-lg hover:bg-muted"
+                  className="px-4 py-2 text-sm font-medium text-black hover:text-primary transition-colors duration-200 rounded-lg hover:bg-muted"
                 >
                   Revisions
                 </button>
@@ -161,7 +164,7 @@ export default function DashboardPage() {
                     <Link href={`/subjects/${task.subject_id}`} key={task.id}>
                       <div className="p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors cursor-pointer flex justify-between items-center">
                         <div>
-                          <p className="font-semibold text-white">{task.title}</p>
+                          <p className="font-semibold text-black">{task.title}</p>
                           <p className="text-sm text-gray-400">
                             Due on: {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'N/A'}
                           </p>

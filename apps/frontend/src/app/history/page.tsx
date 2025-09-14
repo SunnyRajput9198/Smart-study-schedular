@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  Legend
 } from "recharts"
 import { Clock, BookOpen, TrendingUp, Calendar, Award, Target, ArrowLeft, Download, Filter } from "lucide-react"
 import ProtectedRoute from "../../components/ProtectedRoute"
@@ -61,7 +62,6 @@ interface HistorySummary {
     recent_sessions: StudySession[];
 }
 // --- END OF PASTE ---
-
 
 export default function HistoryPage() {
  const [summaryData, setSummaryData] = useState<HistorySummary | null>(null);
@@ -271,11 +271,12 @@ const { stats, timeline_data, subject_chart_data, difficulty_chart_data, recent_
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={difficulty_chart_data} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="count">
+                      <Pie data={difficulty_chart_data} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="count" nameKey="name">
                         {difficulty_chart_data.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
+                      <Legend />
                       <ChartTooltip content={<ChartTooltipContent />} />
                     </PieChart>
                   </ResponsiveContainer>

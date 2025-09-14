@@ -286,6 +286,7 @@ export default function AnalyticsPage() {
                       outerRadius={100}
                       fill="#8884d8"
                       dataKey="value"
+                      labelLine={true}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {subjectPieData.map((entry, index) => (
@@ -299,6 +300,7 @@ export default function AnalyticsPage() {
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "var(--radius)",
                       }}
+                       offset={80}
                     />
                   </PieChart>
                 </ResponsiveContainer>

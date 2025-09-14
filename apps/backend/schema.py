@@ -87,7 +87,8 @@ class TaskBase(BaseModel):
     task_type: TaskType = TaskType.general
 
 class TaskCreate(TaskBase):
-    pass
+    workspace_id: int
+    subject_id: int 
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -283,3 +284,23 @@ class Notification(BaseModel):
 # In the Task Schemas section
 class RescheduleRequest(BaseModel):
     delay_days: int = Field(gt=0, description="Number of days after which to revise the task")
+    
+    
+    
+# --- YEH NAYA SECTION ADD KAREIN ---
+class WorkspaceBase(BaseModel):
+    title: str
+    date: datetime
+
+class WorkspaceCreate(WorkspaceBase):
+    pass
+
+class Workspace(WorkspaceBase):
+    id: int
+    user_id: int
+
+    class Config:
+        from_attributes = True
+        
+class WorkspaceDetail(Workspace):
+    tasks: List[Task] = []

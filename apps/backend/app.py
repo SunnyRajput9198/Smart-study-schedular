@@ -11,7 +11,7 @@ import models
 from database import engine
 
 # Import all routers from the 'routers' directory
-from routes import subjects, tasks, sessions, auth,analytics, pomodoro, history,notifications
+from routes import subjects, tasks, sessions, auth,analytics, pomodoro, history,notifications,workspace
 import routes.ml_endpoint as ml_endpoints
 
 # This line ensures all database tables are created based on your models
@@ -47,10 +47,11 @@ app.include_router(subjects.router)
 app.include_router(tasks.router)
 app.include_router(sessions.router)
 app.include_router(ml_endpoints.router)
-app.include_router(analytics.router) # <-- ADD THIS LINE
-app.include_router(pomodoro.router) # <-- ADD THIS LINE
-app.include_router(history.router) # <-- ADD THIS LINE
-app.include_router(notifications.router) # <-- ADD THIS LINE
+app.include_router(analytics.router) 
+app.include_router(pomodoro.router)
+app.include_router(history.router) 
+app.include_router(notifications.router)
+app.include_router(workspace.router) 
 @app.get("/", tags=["Root"])
 async def read_root():
     return {"message": "Welcome to the Smart Study Scheduler API!"}
