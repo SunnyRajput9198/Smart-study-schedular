@@ -4,13 +4,17 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 import os
-import pandas as pd
+import sys
+from pathlib import Path
 
-# Corrected imports to match project structure
+# Fix the import - it should be 'schemas' not 'schema'
 from database import get_db
 from security import get_current_user
 import models
-import schema
+import schema  # Changed from 'schema' to 'schemas'
+
+# Add parent directory to path for ML imports
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 # Import ML components with error handling
 try:
@@ -47,7 +51,7 @@ def initialize_ml_components():
         print("❌ ML components not available due to import errors")
         return False
     
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
+    DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
         print("❌ FATAL: DATABASE_URL not found. ML components cannot be initialized.")
         return False
@@ -65,8 +69,7 @@ def initialize_ml_components():
         feature_engineer.load_encoders()
         
         if not models_loaded:
-            print("⚠️  Warning: Pre-trained models not found. Training basic models...")
-            # Try to train with existing data or create dummy model
+            print("⚠️  Warning: Pre-trained models not found. Will use fallback predictions.")
             
         print("✅ ML components initialized successfully.")
         return True
@@ -103,7 +106,7 @@ class FallbackPriorityScorer:
             FROM tasks t
             JOIN subjects s ON t.subject_id = s.id
             WHERE s.user_id = $1 
-            AND t.completed = FALSE
+            AND t.status = 'pending'
             ORDER BY priority_score DESC, t.deadline ASC
             LIMIT $2
             """
@@ -160,7 +163,7 @@ async def generate_schedule(
     active_scorer = priority_scorer
     if not active_scorer:
         print("Using fallback priority scorer...")
-        DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/dbname")
+        DATABASE_URL = os.getenv("DATABASE_URL")
         active_scorer = FallbackPriorityScorer(DATABASE_URL)
     
     try:
@@ -171,18 +174,16 @@ async def generate_schedule(
         )
         
         print(f"📋 Got {len(schedule_data)} tasks from scheduler")
-        print(f"📋 Sample data: {schedule_data[:1] if schedule_data else 'No data'}")
         
         # Prepare response using Pydantic models
         formatted_schedule = []
         for task in schedule_data:
-            print(f"🔧 Processing task: {task}")
             formatted_task = schema.ScheduleTask(
                 task_id=task["task_id"],
                 task_name=task["task_name"],
                 subject_name=task["subject_name"],
                 estimated_time=task.get("estimated_time", 30),
-                predicted_time=task.get("estimated_time", 30), # Use estimated as predicted for now
+                predicted_time=task.get("predicted_time", task.get("estimated_time", 30)),
                 priority_score=float(task.get("priority_score", 0.5)),
                 recommendation_reason=get_recommendation_reason(task)
             )
@@ -192,18 +193,17 @@ async def generate_schedule(
         insights = active_scorer.get_schedule_insights(schedule_data)
         print(f"💡 Insights: {insights}")
 
-        return schema.DailySchedule(
-    schedule=formatted_schedule,
-    insights=insights,  # Wrap the list in a dict
-    generated_at=datetime.now()
-)
+        result = schema.DailySchedule(
+            schedule=formatted_schedule,
+            insights=insights,
+            generated_at=datetime.now()
+        )
         
         print("✅ Schedule generated successfully")
         return result
         
     except Exception as e:
         print(f"❌ Error generating schedule: {e}")
-        print(f"❌ Error type: {type(e)}")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate schedule: {str(e)}")
@@ -215,16 +215,21 @@ async def predict_task_time(
     db: Session = Depends(get_db)
 ):
     """Predict actual completion time for a list of specific tasks."""
-    if not time_predictor or not feature_engineer:
-        # Use simple fallback prediction
-        tasks = db.query(models.Task).filter(
-            models.Task.id.in_(tasks_to_predict.task_ids),
-            models.Task.user_id == current_user.id
-        ).all()
+    
+    print(f"Predicting time for tasks: {tasks_to_predict.task_ids}")
+    
+    # Fetch tasks from database
+    tasks = db.query(models.Task).filter(
+        models.Task.id.in_(tasks_to_predict.task_ids),
+        models.Task.user_id == current_user.id
+    ).all()
 
-        if not tasks:
-            raise HTTPException(status_code=404, detail="No valid tasks found for prediction.")
+    if not tasks:
+        raise HTTPException(status_code=404, detail="No valid tasks found for prediction.")
 
+    # Check if ML components are available
+    if not time_predictor or not feature_engineer or not time_predictor.model:
+        print("Using fallback prediction (ML model not available)")
         # Simple fallback: use estimated time with some variation
         results = [
             schema.TimePrediction(
@@ -240,24 +245,29 @@ async def predict_task_time(
         )
 
     try:
-        tasks = db.query(models.Task).filter(
-            models.Task.id.in_(tasks_to_predict.task_ids),
-            models.Task.user_id == current_user.id
-        ).all()
+        # Prepare tasks for ML prediction
+        tasks_for_prediction = []
+        for task in tasks:
+            task_data = {
+                'task_id': task.id, 
+                'estimated_time': task.estimated_time,
+                'subject_id': task.subject_id, 
+                'due_date': task.deadline,  # Map deadline to due_date
+                'user_id': current_user.id
+            }
+            tasks_for_prediction.append(task_data)
+            print(f"Task data prepared: {task_data}")
 
-        if not tasks:
-            raise HTTPException(status_code=404, detail="No valid tasks found for prediction.")
-
-        tasks_for_prediction = [{
-            'task_id': task.id, 
-            'estimated_time': task.estimated_time,
-            'subject_id': task.subject_id, 
-            'due_date': task.deadline,  # Changed from 'deadline' to 'due_date'
-            'user_id': current_user.id
-        } for task in tasks]
-
+        # Use the fixed prepare_prediction_features method
+        print("Preparing prediction features...")
         prediction_features = await feature_engineer.prepare_prediction_features(tasks_for_prediction)
+        
+        print(f"Features prepared: {prediction_features.shape}")
+        print(f"Feature columns: {list(prediction_features.columns)}")
+        
+        # Make predictions
         predictions = time_predictor.predict(prediction_features)
+        print(f"Predictions made: {predictions}")
 
         results = [
             schema.TimePrediction(
@@ -273,15 +283,31 @@ async def predict_task_time(
         )
     except Exception as e:
         print(f"Error in time prediction: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to predict task times: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        
+        # Fall back to simple prediction on error
+        results = [
+            schema.TimePrediction(
+                task_id=task.id,
+                predicted_time_minutes=max(5, int(task.estimated_time * 1.1)),
+                confidence_score=0.5
+            ) for task in tasks
+        ]
+        
+        return schema.TimePredictionResponse(
+            predictions=results,
+            model_version="fallback-error-1.0"
+        )
 
 @router.get("/status")
 async def get_ml_status():
     """Get the status of ML components"""
     return {
         "ml_available": ML_AVAILABLE,
-        "time_predictor_loaded": time_predictor is not None,
+        "time_predictor_loaded": time_predictor is not None and time_predictor.model is not None,
         "feature_engineer_loaded": feature_engineer is not None,
         "priority_scorer_available": PRIORITY_SCORER_AVAILABLE,
-        "priority_scorer_loaded": priority_scorer is not None
+        "priority_scorer_loaded": priority_scorer is not None,
+        "models_directory": os.path.exists("ml/models") if ML_AVAILABLE else False
     }

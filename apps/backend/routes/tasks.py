@@ -112,24 +112,26 @@ def reschedule_task_for_revision(
     db.refresh(new_revision_task)
 
     return new_revision_task
+
+# --- PURAANA create_task... function ISSE REPLACE KAREIN ---
 @router.post("/{subject_id}", response_model=schema.Task, status_code=status.HTTP_201_CREATED)
 def create_task_for_subject(
     subject_id: int,
-    task: schema.TaskCreate, 
+    task_data: schema.TaskCreate, 
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(security.get_current_user)
 ):
-    # First, verify the subject belongs to the current user
+    # Security check
     subject = db.query(models.Subject).filter(
         models.Subject.id == subject_id, 
         models.Subject.user_id == current_user.id
     ).first()
 
     if not subject:
-        raise HTTPException(status_code=404, detail="Subject not found")
+        raise HTTPException(status_code=404, detail="Subject not found or you don't have permission.")
 
     new_task = models.Task(
-        **task.model_dump(), 
+        **task_data.model_dump(), 
         subject_id=subject_id, 
         user_id=current_user.id
     )
@@ -137,7 +139,8 @@ def create_task_for_subject(
     db.commit()
     db.refresh(new_task)
     return new_task
-# Get Tasks for a Subject
+# --- YAHAN TAK REPLACE KAREIN ---
+
 @router.get("/{subject_id}", response_model=List[schema.Task])
 def get_tasks_for_subject(
     subject_id: int,
@@ -156,8 +159,3 @@ def get_tasks_for_subject(
     tasks = db.query(models.Task).filter(models.Task.subject_id == subject_id).all()
     return tasks
 
-# Add this new function to the end of apps/backend/routers/tasks.py
-
-
-
-# --- YEH NAYA FUNCTION PASTE KAREIN ---

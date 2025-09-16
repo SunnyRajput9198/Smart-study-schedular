@@ -65,6 +65,7 @@ class Token(BaseModel):
 # --- Subject Schemas ---
 class SubjectBase(BaseModel):
     name: str
+    date: datetime  # Changed to datetime for better type handling
     color_tag: Optional[str] = "#3B82F6" # Renamed from color to color_tag for consistency
 
 class SubjectCreate(SubjectBase):
@@ -74,7 +75,7 @@ class Subject(SubjectBase):
     id: int
     user_id: int
     created_at: datetime
-    
+    date: datetime
     class Config:
         from_attributes = True
 
@@ -87,8 +88,7 @@ class TaskBase(BaseModel):
     task_type: TaskType = TaskType.general
 
 class TaskCreate(TaskBase):
-    workspace_id: int
-    subject_id: int 
+    pass
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -286,21 +286,3 @@ class RescheduleRequest(BaseModel):
     delay_days: int = Field(gt=0, description="Number of days after which to revise the task")
     
     
-    
-# --- YEH NAYA SECTION ADD KAREIN ---
-class WorkspaceBase(BaseModel):
-    title: str
-    date: datetime
-
-class WorkspaceCreate(WorkspaceBase):
-    pass
-
-class Workspace(WorkspaceBase):
-    id: int
-    user_id: int
-
-    class Config:
-        from_attributes = True
-        
-class WorkspaceDetail(Workspace):
-    tasks: List[Task] = []

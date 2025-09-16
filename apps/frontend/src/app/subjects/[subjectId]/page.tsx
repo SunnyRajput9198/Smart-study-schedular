@@ -161,7 +161,7 @@ const fetchAllData = useCallback(async () => {
 
 const handleSessionSaved = (completedTask: Task) => {
     setTasks((currentTasks) =>
-        currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "completed" } : task)),
+        currentTasks.map((task) => (task.id === completedTask.id ? { ...task, status: "complete" } : task)),
     );
     setSelectedTask(null);
     fetchAllData(); // Refresh all data

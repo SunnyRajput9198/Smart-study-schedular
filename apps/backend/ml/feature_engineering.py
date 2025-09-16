@@ -193,68 +193,117 @@ class FeatureEngineer:
             print("No saved encoders found. Will create new ones during training.")
     
     async def prepare_prediction_features(self, tasks_data: List[Dict]) -> pd.DataFrame:
-        """Prepare features for prediction on new tasks"""
-        df = pd.DataFrame(tasks_data)
-        
-        # Add current time features
-        now = datetime.now()
-        df['hour_of_day'] = now.hour
-        df['day_of_week'] = now.weekday()
-        df['is_weekend'] = int(now.weekday() >= 5)
-        # Calculate days until due
-        df['due_date'] = pd.to_datetime(df['due_date'])
-        df['days_until_due'] = (df['due_date'] - now).dt.days
-        
-        # Get subject statistics from training data
-        training_df = await self.fetch_training_data()
-        if not training_df.empty:
-            training_df = self.create_subject_features(training_df)
-            training_df = self.create_user_features(training_df)
-            
-            subject_stats = training_df.groupby('subject_id').agg({
-                'user_difficulty_rating': 'mean',
-                'time_ratio': 'mean'
-            }).rename(columns={
-                'user_difficulty_rating': 'subject_avg_difficulty',
-                'time_ratio': 'subject_avg_time_ratio'
-            })
-            
-            user_stats = training_df.groupby('user_id').agg({
-                'time_ratio': 'mean'
-            }).rename(columns={
-                'time_ratio': 'user_avg_time_ratio'
-            })
-            
-            # Merge stats
-            df = df.merge(subject_stats, left_on='subject_id', right_index=True, how='left')
-            df = df.merge(user_stats, left_on='user_id', right_index=True, how='left')
-        
-        # Fill missing values with defaults
-        df['subject_avg_difficulty'] = df['subject_avg_difficulty'].fillna(3.0)
-        df['subject_avg_time_ratio'] = df['subject_avg_time_ratio'].fillna(1.0)
-        df['user_avg_time_ratio'] = df['user_avg_time_ratio'].fillna(1.0)
-        
-        # Encode categorical features
-        if 'subject_id' in self.label_encoders:
-            # Handle unknown subjects
-            known_subjects = set(self.label_encoders['subject_id'].classes_)
-            df['subject_id_encoded'] = df['subject_id'].apply(
-                lambda x: self.label_encoders['subject_id'].transform([x])[0] if x in known_subjects else -1
-            )
-        else:
-            df['subject_id_encoded'] = df['subject_id']
-        
-        # Select prediction features
-        feature_columns = [
-            'estimated_time',
-            'subject_id_encoded',
-            'hour_of_day',
-            'day_of_week',
-            'is_weekend',
-            'subject_avg_difficulty',
-            'subject_avg_time_ratio',
-            'user_avg_time_ratio',
-            'days_until_due'
-        ]
-        
-        return df[feature_columns].fillna(0)
+      """Prepare features for prediction on new tasks"""
+      df = pd.DataFrame(tasks_data)
+    
+    # Add current time features
+      now = datetime.now()
+      df['hour_of_day'] = now.hour
+      df['day_of_week'] = now.weekday()
+      df['is_weekend'] = int(now.weekday() >= 5)
+      
+      # Calculate days until due
+      df['due_date'] = pd.to_datetime(df['due_date'])
+      df['days_until_due'] = (df['due_date'] - now).dt.days
+      
+      # Initialize default values for all required features
+      df['subject_avg_difficulty'] = 3.0  # Default difficulty
+      df['subject_avg_time_ratio'] = 1.0  # Default time ratio
+      df['user_avg_time_ratio'] = 1.0     # Default user ratio
+      
+      # Try to get subject statistics from training data
+      try:
+          training_df = await self.fetch_training_data()
+          if not training_df.empty:
+              # Extract time features for training data
+              training_df = self.extract_time_features(training_df)
+              
+              # Calculate time_ratio for training data
+              training_df['time_ratio'] = training_df['actual_duration'] / training_df['estimated_time']
+              
+              # Calculate subject-level statistics
+              subject_stats = training_df.groupby('subject_id').agg({
+                  'user_difficulty_rating': 'mean',
+                  'time_ratio': 'mean'
+              }).rename(columns={
+                  'user_difficulty_rating': 'subject_avg_difficulty',
+                  'time_ratio': 'subject_avg_time_ratio'
+              })
+              
+              # Calculate user-level statistics
+              user_stats = training_df.groupby('user_id').agg({
+                  'time_ratio': 'mean'
+              }).rename(columns={
+                  'time_ratio': 'user_avg_time_ratio'
+              })
+              
+              # Update values where we have statistics
+              for idx, row in df.iterrows():
+                  # Update subject stats if available
+                  if row['subject_id'] in subject_stats.index:
+                      df.at[idx, 'subject_avg_difficulty'] = subject_stats.loc[row['subject_id'], 'subject_avg_difficulty']
+                      df.at[idx, 'subject_avg_time_ratio'] = subject_stats.loc[row['subject_id'], 'subject_avg_time_ratio']
+                  
+                  # Update user stats if available
+                  if row['user_id'] in user_stats.index:
+                      df.at[idx, 'user_avg_time_ratio'] = user_stats.loc[row['user_id'], 'user_avg_time_ratio']
+      except Exception as e:
+          print(f"Warning: Could not fetch training statistics: {e}")
+          # Continue with default values
+      
+      # Encode categorical features
+      df['subject_id_encoded'] = -1  # Default for unknown subjects
+      
+      if 'subject_id' in self.label_encoders:
+          # Handle known subjects
+          known_subjects = set(self.label_encoders['subject_id'].classes_)
+          for idx, row in df.iterrows():
+              if row['subject_id'] in known_subjects:
+                  df.at[idx, 'subject_id_encoded'] = self.label_encoders['subject_id'].transform([row['subject_id']])[0]
+      else:
+          # If no encoder exists, use subject_id directly (as numeric)
+          df['subject_id_encoded'] = pd.to_numeric(df['subject_id'], errors='coerce').fillna(-1)
+      
+      # Select prediction features in the correct order
+      feature_columns = [
+          'estimated_time',
+          'subject_id_encoded',
+          'hour_of_day',
+          'day_of_week',
+          'is_weekend',
+          'subject_avg_difficulty',
+          'subject_avg_time_ratio',
+          'user_avg_time_ratio',
+          'days_until_due'
+      ]
+      
+      # Ensure all columns exist and fill any remaining NaN values
+      for col in feature_columns:
+          if col not in df.columns:
+              print(f"Warning: Missing column {col}, using default value")
+              if col in ['subject_avg_difficulty']:
+                  df[col] = 3.0
+              elif col in ['subject_avg_time_ratio', 'user_avg_time_ratio']:
+                  df[col] = 1.0
+              else:
+                  df[col] = 0
+      
+      result_df = df[feature_columns].copy()
+      
+      # Final safety check - fill any NaN values
+      result_df = result_df.fillna({
+          'estimated_time': 30,
+          'subject_id_encoded': -1,
+          'hour_of_day': 12,
+          'day_of_week': 3,
+          'is_weekend': 0,
+          'subject_avg_difficulty': 3.0,
+          'subject_avg_time_ratio': 1.0,
+          'user_avg_time_ratio': 1.0,
+          'days_until_due': 7
+      })
+      
+      print(f"Prepared features shape: {result_df.shape}")
+      print(f"Feature columns: {list(result_df.columns)}")
+      
+      return result_df

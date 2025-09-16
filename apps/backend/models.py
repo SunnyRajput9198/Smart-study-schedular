@@ -6,6 +6,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+from sqlalchemy.sql import func
 
 class User(Base):
     __tablename__ = "users"
@@ -23,7 +24,6 @@ class User(Base):
     study_sessions = relationship("StudySession", back_populates="user")
     pomodoro_sessions = relationship("PomodoroSession", back_populates="user")
     preferences = relationship("UserPreferences", back_populates="user", uselist=False)
-    workspaces = relationship("Workspace", back_populates="user")
 
 class Subject(Base):
     __tablename__ = "subjects"
@@ -32,6 +32,7 @@ class Subject(Base):
     name = Column(String, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, nullable=False,server_default=func.now())
     color_tag = Column(String, default="#3B82F6")
     
     # THE FIX: Changed 'owner' to 'user' for consistency and added back_populates
@@ -45,7 +46,6 @@ class Task(Base):
     title = Column(String, index=True, nullable=False)
     estimated_time = Column(Integer)
     deadline = Column(DateTime, nullable=True)
-    workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=False) # <-- YEH LINE ADD KAREIN
     status = Column(String, default="pending")
     subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -56,7 +56,6 @@ class Task(Base):
     subject = relationship("Subject", back_populates="tasks")
     user = relationship("User", back_populates="tasks")
     study_sessions = relationship("StudySession", back_populates="task")
-    workspace = relationship("Workspace", back_populates="tasks") # <-- YEH LINE ADD KAREIN
     pomodoro_sessions = relationship("PomodoroSession", back_populates="task")
 
 class StudySession(Base):
@@ -99,17 +98,3 @@ class UserPreferences(Base):
     
     # THE FIX: Changed 'owner' to 'user' for consistency
     user = relationship("User", back_populates="preferences")
-    
-# --- YEH NAYA MODEL ADD KAREIN ---
-class Workspace(Base):
-    __tablename__ = "workspaces"
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    date = Column(DateTime, nullable=False)
-
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
-    # Relationships
-    user = relationship("User", back_populates="workspaces")
-    tasks = relationship("Task", back_populates="workspace")

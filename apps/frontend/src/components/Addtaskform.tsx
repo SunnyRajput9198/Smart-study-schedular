@@ -27,10 +27,10 @@ export default function AddTaskForm({ subjectId, onTaskAdded }: Props) {
 
     try {
       const taskData = {
-        title,
-        estimated_time: parseInt(estimatedTime, 10),
-        deadline: deadline ? new Date(deadline).toISOString() : null,
-      };
+    title,
+    estimated_time: parseInt(estimatedTime, 10),
+    deadline: deadline ? new Date(deadline).toISOString() : null
+};
 
       const response = await apiClient.post(`/tasks/${subjectId}`, taskData);
       

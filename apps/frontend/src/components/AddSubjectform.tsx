@@ -17,7 +17,7 @@ interface AddSubjectFormProps {
 export default function AddSubjectForm({ onSubjectAdded }: AddSubjectFormProps) {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]); // <-- YEH LINE ADD KAREIN
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -27,7 +27,7 @@ export default function AddSubjectForm({ onSubjectAdded }: AddSubjectFormProps) 
     setError('');
 
     try {
-      const response = await apiClient.post('/subjects/', { name });
+      const response = await apiClient.post('/subjects/', { name, date : new Date(date).toISOString() });
       onSubjectAdded(response.data); // Pass the new subject back to the parent
       setName(''); // Clear the input field
     } catch (err) {
@@ -48,6 +48,17 @@ export default function AddSubjectForm({ onSubjectAdded }: AddSubjectFormProps) 
           placeholder="e.g., Quantum Physics"
           className="flex-grow px-3 py-2 text-white bg-black rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <div className="flex-grow">
+          <label htmlFor="subject-date" className="block text-sm font-medium text-gray-300">Date</label>
+          <input
+            id="subject-date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full p-2 mt-1 bg-gray-700 border border-gray-600 rounded-md"
+            required
+          />
+        </div>
         <button type="submit" className="px-6 py-2 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">
           Add Subject
         </button>

@@ -110,7 +110,7 @@ class SyntheticDataGenerator:
         try:
             conn = await asyncpg.connect(self.database_url)
             if clear_data:
-                await conn.execute("DELETE FROM study_sessions; DELETE FROM tasks; DELETE FROM subjects; DELETE FROM users;")
+                await conn.execute("DELETE FROM study_sessions; DELETE FROM tasks;DELETE FROM workspaces; DELETE FROM subjects; DELETE FROM users;")
             
             user_ids = await self.generate_users(conn)
             subject_ids_map = await self.generate_subjects(conn, user_ids)
