@@ -205,11 +205,17 @@ class PerformanceMetrics(BaseModel):
     average_session_quality: float
     improvement_trend: float
 
+class TaskDistribution(BaseModel):
+    subject_name: str
+    task_count: int
+# --- YAHAN TAK ADD KAREIN ---
+
 class AnalyticsSummary(BaseModel):
     subjects: List[SubjectAnalytics]
     daily: DailyAnalytics
     weekly: WeeklyStreak
     performance: PerformanceMetrics
+    task_distribution: List[TaskDistribution]
 # ==============================================================================
 # 6. Pomodoro Schemas
 # ==============================================================================
@@ -286,3 +292,4 @@ class RescheduleRequest(BaseModel):
     delay_days: int = Field(gt=0, description="Number of days after which to revise the task")
     
     
+# --- YEH NAYI CLASS ADD KAREIN ---

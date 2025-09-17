@@ -93,7 +93,20 @@ def get_analytics_summary(
         weekly_goal=350,  # NOTE: Hardcoded goal, can be made a user setting later
         total_weekly_minutes=total_weekly_minutes
     )
-
+    # --- YEH NAYA BLOCK PASTE KAREIN ---
+# --- 3.5. Task Distribution by Subject ---
+    task_dist_query = db.query(
+        models.Subject.name,
+        func.count(models.Task.id).label("task_count")
+    ).join(models.Task, models.Subject.id == models.Task.subject_id).filter(
+        models.Subject.user_id == user_id
+    ).group_by(models.Subject.name).order_by(func.count(models.Task.id).desc()).all()
+    
+    task_distribution_data = [
+        schema.TaskDistribution(subject_name=name, task_count=count or 0)
+        for name, count in task_dist_query
+    ]
+# --- YAHAN TAK PASTE KAREIN ---
     # --- 4. Performance Metrics (Calculated) ---
     total_focus_sessions = db.query(func.count(models.PomodoroSession.id)).filter(models.PomodoroSession.user_id == user_id).scalar() or 0
     
@@ -115,7 +128,8 @@ def get_analytics_summary(
         subjects=subject_data,
         daily=daily_data,
         weekly=weekly_data,
-        performance=performance_data
+        performance=performance_data,
+        task_distribution=task_distribution_data
     )
 
 @router.get("/recommendations", response_model=schema.InsightsResponse)
