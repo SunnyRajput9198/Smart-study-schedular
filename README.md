@@ -66,7 +66,7 @@
    git clone https://github.com/SunnyRajput9198/Smart-study-schedular.git
    ```
    ```bash
-   cd smrt-Study-scheduler
+   cd smrt-study-scheduler
    ```
    ```bash
    npm install
