@@ -78,3 +78,4 @@
     ```bash
     cd apps/backend
 ./run.sh
+```
