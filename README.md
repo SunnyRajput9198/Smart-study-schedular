@@ -31,7 +31,6 @@
 - **Frontend:** React, Tailwind CSS  
 - **Backend:** Python,flask,fastapi
 - **Database:** PostgreSQL (or your preferred DB)  
-- **Other Tools:** Docker, Vite, Email/Notification APIs (optional)
 
 ---
 
@@ -75,3 +74,7 @@
    ```bash
    npm run dev
    ```
+ 2.  Open a new terminal, navigate to the backend folder, and run the Flask backend:
+    ```bash
+    cd apps/backend
+./run.sh

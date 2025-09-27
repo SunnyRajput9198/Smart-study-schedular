@@ -3,13 +3,15 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "dev": "concurrently \"npm run dev:frontend\"",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
     "@types/date-fns": "^2.5.3",
+    "concurrently": "^9.2.1",
     "prettier": "^3.6.2",
     "turbo": "^2.5.6",
     "typescript": "5.9.2"
