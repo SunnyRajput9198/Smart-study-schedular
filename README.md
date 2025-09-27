@@ -74,8 +74,10 @@
    ```bash
    npm run dev
    ```
- 2.  Open a new terminal, navigate to the backend folder, and run the Flask backend:
+2.  Open a new terminal, navigate to the backend folder, and run the Flask backend:
     ```bash
     cd apps/backend
+    ```
+    ```bash
 ./run.sh
 ```
