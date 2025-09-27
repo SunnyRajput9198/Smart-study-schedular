@@ -29,7 +29,7 @@
 ## Tech Stack
 
 - **Frontend:** React, Tailwind CSS  
-- **Backend:** Node.js, Express.js  
+- **Backend:** Python,flask,fastapi
 - **Database:** PostgreSQL (or your preferred DB)  
 - **Other Tools:** Docker, Vite, Email/Notification APIs (optional)
 
@@ -66,6 +66,12 @@
    ```bash
    git clone https://github.com/SunnyRajput9198/Smart-study-schedular.git
    ```
+   ```bash
    cd Smart-Study-Scheduler
+   ```
+   ```bash
    npm install
+   ```
+   ```bash
    npm run dev
+   ```
