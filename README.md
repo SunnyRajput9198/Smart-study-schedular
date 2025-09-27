@@ -66,7 +66,7 @@
    git clone https://github.com/SunnyRajput9198/Smart-study-schedular.git
    ```
    ```bash
-   cd Smart-Study-Scheduler
+   cd smrt-Study-scheduler
    ```
    ```bash
    npm install
@@ -76,8 +76,8 @@
    ```
 2.  Open a new terminal, navigate to the backend folder, and run the Flask backend:
     ```bash
-    cd apps/backend
+    cd smrt-study-schedular/apps/backend
     ```
     ```bash
-./run.sh
-```
+    ./run.sh
+    ```
