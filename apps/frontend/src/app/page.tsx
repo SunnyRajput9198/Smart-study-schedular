@@ -16,6 +16,7 @@ interface Subject {
   id: number
   name: string
   color_tag: string | null
+deadline?: string | null
 }
 interface Task {
   id: number;
@@ -259,7 +260,7 @@ export default function DashboardPage() {
 
           <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">Your Subjects</h2>
+              <h2 className="text-2xl font-bold text-black">Subjects</h2>
               <span className="text-sm text-muted-foreground">{subjects.length} subjects</span>
             </div>
 
@@ -283,7 +284,10 @@ export default function DashboardPage() {
                           <div>
                             <h3 className="font-semibold text-black group-hover:text-primary transition-colors duration-200">
                               {subject.name}
+                              
                             </h3>
+                        
+                            
                             <p className="text-sm text-muted-foreground">Click to view tasks</p>
                           </div>
                         </div>
